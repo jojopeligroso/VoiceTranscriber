@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VoiceTranscriber",
   description: "Private voice-to-text transcription",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

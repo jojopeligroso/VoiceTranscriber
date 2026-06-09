@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useWhisperBrowser, type FileProgress } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
+import type { TranscriptionResult } from '@/lib/transcribe';
 import AudioRecorder from './AudioRecorder';
 import TranscriptDisplay from './TranscriptDisplay';
 import ModeToggle from './ModeToggle';
@@ -75,6 +76,79 @@ function ModelDownloadProgress({ progress, files }: { progress: number; files: F
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: TranscriptionResult | null }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="w-full text-xs text-gray-500">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-center gap-1.5 py-1 hover:text-gray-400 transition-colors"
+      >
+        <span>
+          {mode === 'browser' ? 'Audio stays on your device' : 'Audio sent to OpenAI API'}
+          {' \u00B7 English only'}
+        </span>
+        <svg
+          className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-400 space-y-3">
+          <div>
+            <p className="font-medium text-gray-300 mb-1">How it works</p>
+            <ol className="list-decimal list-inside space-y-0.5">
+              <li>Tap <strong>Get ready</strong> to load the speech engine (one-time)</li>
+              <li>Tap the mic to start recording</li>
+              <li>Speak naturally, then tap stop</li>
+              <li>Your text appears — tap to edit, then copy</li>
+            </ol>
+          </div>
+
+          <div>
+            <p className="font-medium text-gray-300 mb-1">Limits</p>
+            <ul className="space-y-0.5">
+              <li>Best results under <strong>2-3 minutes</strong> per recording</li>
+              <li>Longer recordings take proportionally longer to process</li>
+              <li>English speech only (browser mode)</li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="font-medium text-gray-300 mb-1">Privacy</p>
+            <p>
+              {mode === 'browser'
+                ? 'Audio is processed entirely on your device using Whisper (whisper-tiny.en). Nothing is uploaded — your voice data never leaves this browser.'
+                : 'Audio is sent to OpenAI\'s Whisper API for processing. It is not stored or used for training.'}
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium text-gray-300 mb-1">Technical</p>
+            <ul className="space-y-0.5">
+              <li>Model: whisper-tiny.en (fp32, ~150 MB download)</li>
+              <li>Processing: WebAssembly, runs on your CPU</li>
+              <li>Model is cached in your browser after first download</li>
+            </ul>
+          </div>
+
+          {lastResult && (
+            <div className="pt-2 border-t border-gray-700/50 text-gray-600 tabular-nums">
+              Last: {lastResult.audioDurationS}s audio
+              {' \u00B7 '}{lastResult.chunks} chunk{lastResult.chunks !== 1 ? 's' : ''}
+              {' \u00B7 '}{(lastResult.durationMs / 1000).toFixed(1)}s processing
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -278,19 +352,10 @@ export default function VoiceTranscriber({
         </button>
       )}
 
-      <div className="text-xs text-gray-600 text-center space-y-1">
-        <p>
-          {mode === 'browser' ? 'Audio stays on your device' : 'Audio sent to OpenAI API'}
-          {' \u00B7 English only'}
-        </p>
-        {whisperBrowser.lastResult && (
-          <p className="text-gray-700 tabular-nums">
-            {whisperBrowser.lastResult.audioDurationS}s audio
-            {' \u00B7 '}{whisperBrowser.lastResult.chunks} chunk{whisperBrowser.lastResult.chunks !== 1 ? 's' : ''}
-            {' \u00B7 '}{(whisperBrowser.lastResult.durationMs / 1000).toFixed(1)}s processing
-          </p>
-        )}
-      </div>
+      <InfoPanel
+        mode={mode}
+        lastResult={whisperBrowser.lastResult}
+      />
     </div>
   );
 }

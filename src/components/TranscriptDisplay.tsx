@@ -131,40 +131,40 @@ export default function TranscriptDisplay({
       >
         {/* Action buttons */}
         {hasText && (
-          <div className="absolute top-2 right-2 flex gap-1 z-10">
+          <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 if (isEditing && onTextChange && editedText !== text) onTextChange(editedText);
                 setIsEditing(!isEditing);
               }}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={`p-2 rounded-md transition-colors ${
                 isEditing
                   ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
                   : 'text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)]'
               }`}
               title={isEditing ? 'Done editing' : 'Edit text'}
             >
-              <PenIcon className="w-4 h-4" />
+              <PenIcon className="w-7 h-7" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleCopy(); }}
-              className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
+              className="p-2 rounded-md text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
               title="Copy to clipboard"
             >
               {copied ? (
-                <CheckIcon className="w-4 h-4 text-[var(--teal)]" />
+                <CheckIcon className="w-7 h-7 text-[var(--teal)]" />
               ) : (
-                <CopyIcon className="w-4 h-4" />
+                <CopyIcon className="w-7 h-7" />
               )}
             </button>
             {onClear && (
               <button
                 onClick={(e) => { e.stopPropagation(); onClear(); }}
-                className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
+                className="p-2 rounded-md text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
                 title="Clear transcript"
               >
-                <TrashIcon className="w-4 h-4" />
+                <TrashIcon className="w-7 h-7" />
               </button>
             )}
           </div>
@@ -172,7 +172,7 @@ export default function TranscriptDisplay({
 
         {/* Copied feedback */}
         {copied && (
-          <div className="absolute top-2 right-28 text-xs text-[var(--teal)] bg-[var(--surface)] px-2 py-1 rounded z-10">
+          <div className="absolute top-14 right-16 text-xs text-[var(--teal)] bg-[var(--surface)] px-2 py-1 rounded z-10">
             Copied!
           </div>
         )}
@@ -182,10 +182,10 @@ export default function TranscriptDisplay({
             ref={textareaRef}
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
-            className="w-full min-h-[240px] sm:min-h-[320px] bg-transparent text-[var(--fg)] text-base p-4 pr-28 resize-y focus:outline-none"
+            className="w-full min-h-[240px] sm:min-h-[320px] bg-transparent text-[var(--fg)] text-base p-4 pr-16 resize-y focus:outline-none"
           />
         ) : hasText ? (
-          <p className="text-[var(--fg)] text-base whitespace-pre-wrap p-4 pr-28">{displayText}</p>
+          <p className="text-[var(--fg)] text-base whitespace-pre-wrap p-4 pr-16">{displayText}</p>
         ) : (
           <div className="flex items-center justify-center min-h-[240px] sm:min-h-[320px]">
             <p className="text-sm text-[var(--muted)] italic">

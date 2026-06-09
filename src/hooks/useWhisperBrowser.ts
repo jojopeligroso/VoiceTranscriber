@@ -131,15 +131,30 @@ export function useWhisperBrowser() {
       const float32 = await audioToFloat32(blob);
 
       const start = performance.now();
-      const result = await pipe(float32, {
-        chunk_length_s: 30,
-        stride_length_s: 5,
-        return_timestamps: true,
-      });
+
+      // Manual chunking: split audio into ~28s segments and transcribe each.
+      // Whisper has a 30-second context window; the pipeline's built-in
+      // chunking doesn't work reliably with WASM + fp32.
+      const SAMPLE_RATE = 16000;
+      const CHUNK_SECONDS = 28;
+      const CHUNK_SAMPLES = CHUNK_SECONDS * SAMPLE_RATE;
+
+      const chunks: string[] = [];
+      for (let offset = 0; offset < float32.length; offset += CHUNK_SAMPLES) {
+        const end = Math.min(offset + CHUNK_SAMPLES, float32.length);
+        const segment = float32.slice(offset, end);
+        // Skip very short trailing segments (< 0.5s)
+        if (segment.length < SAMPLE_RATE * 0.5) break;
+        const segResult = await pipe(segment);
+        const segText = (segResult.text || '').trim();
+        if (segText) chunks.push(segText);
+      }
+
+      const fullText = chunks.join(' ');
       const durationMs = performance.now() - start;
 
       const transcriptionResult: TranscriptionResult = {
-        text: result.text.trim(),
+        text: fullText,
         mode: 'browser',
         durationMs,
       };

@@ -58,9 +58,14 @@ export default function TranscriptDisplay({
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync external text changes
+  // Sync external text changes; exit edit mode if text is cleared
   useEffect(() => {
-    if (!isEditing) setEditedText(text);
+    if (!text) {
+      setIsEditing(false);
+      setEditedText('');
+    } else if (!isEditing) {
+      setEditedText(text);
+    }
   }, [text, isEditing]);
 
   // Auto-focus textarea when entering edit mode

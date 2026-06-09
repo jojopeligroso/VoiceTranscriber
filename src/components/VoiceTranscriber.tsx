@@ -278,10 +278,19 @@ export default function VoiceTranscriber({
         </button>
       )}
 
-      <p className="text-xs text-gray-600 text-center">
-        {mode === 'browser' ? 'Audio stays on your device' : 'Audio sent to OpenAI API'}
-        {' \u00B7 English only'}
-      </p>
+      <div className="text-xs text-gray-600 text-center space-y-1">
+        <p>
+          {mode === 'browser' ? 'Audio stays on your device' : 'Audio sent to OpenAI API'}
+          {' \u00B7 English only'}
+        </p>
+        {whisperBrowser.lastResult && (
+          <p className="text-gray-700 tabular-nums">
+            {whisperBrowser.lastResult.audioDurationS}s audio
+            {' \u00B7 '}{whisperBrowser.lastResult.chunks} chunk{whisperBrowser.lastResult.chunks !== 1 ? 's' : ''}
+            {' \u00B7 '}{(whisperBrowser.lastResult.durationMs / 1000).toFixed(1)}s processing
+          </p>
+        )}
+      </div>
     </div>
   );
 }

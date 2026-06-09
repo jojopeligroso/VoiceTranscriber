@@ -22,6 +22,7 @@ let pipelinePromise: Promise<unknown> | null = null;
 export function useWhisperBrowser() {
   const [state, setState] = useState<WhisperState>('idle');
   const [text, setText] = useState('');
+  const [lastResult, setLastResult] = useState<TranscriptionResult | null>(null);
   const [modelProgress, setModelProgress] = useState(0);
   const [fileProgresses, setFileProgresses] = useState<FileProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -153,13 +154,18 @@ export function useWhisperBrowser() {
       const fullText = chunks.join(' ');
       const durationMs = performance.now() - start;
 
+      const audioDurationS = Math.round(float32.length / SAMPLE_RATE);
+
       const transcriptionResult: TranscriptionResult = {
         text: fullText,
         mode: 'browser',
         durationMs,
+        audioDurationS,
+        chunks: chunks.length,
       };
 
       setText(transcriptionResult.text);
+      setLastResult(transcriptionResult);
       setState('done');
       return transcriptionResult;
     } catch (err) {
@@ -180,5 +186,5 @@ export function useWhisperBrowser() {
     setFileProgresses([]);
   }, []);
 
-  return { transcribe, loadModel, text, state, modelProgress, fileProgresses, modelReady, error, reset };
+  return { transcribe, loadModel, text, lastResult, state, modelProgress, fileProgresses, modelReady, error, reset };
 }

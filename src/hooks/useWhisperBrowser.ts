@@ -16,13 +16,17 @@ export function useWhisperBrowser() {
   const [text, setText] = useState('');
   const [modelProgress, setModelProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const loadPipeline = useCallback(async () => {
-    // Return cached pipeline
-    if (cachedPipeline) return cachedPipeline;
+  const [modelReady, setModelReady] = useState(!!cachedPipeline);
 
-    // Wait for in-flight load
+  const loadPipeline = useCallback(async () => {
+    if (cachedPipeline) {
+      setModelReady(true);
+      return cachedPipeline;
+    }
+
     if (pipelinePromise) {
       await pipelinePromise;
+      setModelReady(true);
       return cachedPipeline;
     }
 
@@ -48,8 +52,22 @@ export function useWhisperBrowser() {
     cachedPipeline = await pipelinePromise;
     pipelinePromise = null;
     setModelProgress(100);
+    setModelReady(true);
+    setState('idle');
     return cachedPipeline;
   }, []);
+
+  const loadModel = useCallback(async () => {
+    try {
+      await loadPipeline();
+    } catch (err) {
+      cachedPipeline = null;
+      pipelinePromise = null;
+      const msg = err instanceof Error ? err.message : 'Failed to download model';
+      setError(msg);
+      setState('error');
+    }
+  }, [loadPipeline]);
 
   const transcribe = useCallback(async (blob: Blob): Promise<TranscriptionResult | null> => {
     setError(null);
@@ -76,7 +94,6 @@ export function useWhisperBrowser() {
       setState('done');
       return transcriptionResult;
     } catch (err) {
-      // Reset module cache so retry can re-attempt model load
       cachedPipeline = null;
       pipelinePromise = null;
       const msg = err instanceof Error ? err.message : 'Transcription failed';
@@ -93,5 +110,5 @@ export function useWhisperBrowser() {
     setModelProgress(0);
   }, []);
 
-  return { transcribe, text, state, modelProgress, error, reset };
+  return { transcribe, loadModel, text, state, modelProgress, modelReady, error, reset };
 }

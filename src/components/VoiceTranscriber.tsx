@@ -38,10 +38,15 @@ export default function VoiceTranscriber({
     whisperAPI.state === 'transcribing';
 
   const hasResult = activeWhisper.state === 'done' && !!activeWhisper.text;
-  const hasError = activeWhisper.state === 'error';
 
-  // Show recorder when idle or recording; hide when processing or showing result
-  const showRecorder = recorder.state === 'idle' || recorder.state === 'recording';
+  // Model is ready when it's been loaded (idle after first load, or done/error states)
+  const modelReady = whisperBrowser.modelReady;
+
+  // In browser mode, show recorder only after model is ready
+  // In API mode, show recorder immediately
+  const showRecorder =
+    (mode === 'api' || modelReady) &&
+    (recorder.state === 'idle' || recorder.state === 'recording');
 
   // Gate auto-transcribe to current recording cycle only
   const recordingIdRef = useRef(0);
@@ -63,6 +68,10 @@ export default function VoiceTranscriber({
       lastBlobIdRef.current = recordingIdRef.current;
     }
   }, [recorder.audioBlob]);
+
+  const handleGetReady = () => {
+    whisperBrowser.loadModel();
+  };
 
   const handleStart = () => {
     recordingIdRef.current++;
@@ -99,6 +108,40 @@ export default function VoiceTranscriber({
       <h1 className="text-2xl font-semibold text-gray-100">VoiceTranscriber</h1>
 
       <ModeToggle mode={mode} onChange={setMode} apiAvailable={apiAvailable} />
+
+      {/* Get Ready: shown before model is loaded in browser mode */}
+      {mode === 'browser' && !modelReady && whisperBrowser.state === 'idle' && (
+        <button
+          onClick={handleGetReady}
+          className="flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-500 transition-colors"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" />
+          </svg>
+          Get ready
+        </button>
+      )}
+
+      {/* Model download progress */}
+      {mode === 'browser' && whisperBrowser.state === 'loading-model' && (
+        <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-200">Preparing speech engine</p>
+              <span className="text-sm tabular-nums text-gray-400">{whisperBrowser.modelProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${whisperBrowser.modelProgress}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              One-time download (~40 MB). Cached for future use.
+            </p>
+          </div>
+        </div>
+      )}
 
       {showRecorder && (
         <AudioRecorder
@@ -140,6 +183,16 @@ export default function VoiceTranscriber({
         </div>
       )}
 
+      {/* Transcribing spinner — only when model is loaded and actively processing audio */}
+      {activeWhisper.state === 'transcribing' && (
+        <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />
+            <p className="text-sm text-gray-300">Transcribing audio...</p>
+          </div>
+        </div>
+      )}
+
       <TranscriptDisplay
         text={activeWhisper.text}
         isProcessing={isProcessing}
@@ -147,7 +200,6 @@ export default function VoiceTranscriber({
         whisperState={activeWhisper.state}
       />
 
-      {/* New recording button after successful transcription */}
       {hasResult && (
         <button
           onClick={handleNewRecording}

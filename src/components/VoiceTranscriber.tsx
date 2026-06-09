@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useWhisperBrowser } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
@@ -13,6 +13,7 @@ type Mode = 'browser' | 'api';
 export default function VoiceTranscriber() {
   const apiAvailable = !!process.env.NEXT_PUBLIC_HAS_API_KEY;
   const [mode, setMode] = useState<Mode>('browser');
+  const [dismissedError, setDismissedError] = useState<string | null>(null);
 
   const recorder = useAudioRecorder();
   const whisperBrowser = useWhisperBrowser();
@@ -32,13 +33,28 @@ export default function VoiceTranscriber() {
   }, [recorder.state, recorder.audioBlob, activeWhisper]);
 
   const handleStart = () => {
+    setDismissedError(null);
     whisperBrowser.reset();
     whisperAPI.reset();
     recorder.start();
   };
 
+  const handleRetry = useCallback(() => {
+    if (recorder.audioBlob) {
+      setDismissedError(null);
+      activeWhisper.reset();
+      // Small delay to let state settle before re-triggering
+      setTimeout(() => {
+        if (recorder.audioBlob) activeWhisper.transcribe(recorder.audioBlob);
+      }, 50);
+    }
+  }, [recorder.audioBlob, activeWhisper]);
+
+  const currentError = recorder.error || activeWhisper.error;
+  const showError = currentError && currentError !== dismissedError;
+
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto p-6">
+    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-semibold text-gray-100">VoiceTranscriber</h1>
 
       <ModeToggle mode={mode} onChange={setMode} apiAvailable={apiAvailable} />
@@ -50,20 +66,53 @@ export default function VoiceTranscriber() {
         onStop={recorder.stop}
       />
 
-      {recorder.error && (
-        <p className="text-sm text-red-400 text-center">{recorder.error}</p>
-      )}
-
-      {activeWhisper.error && (
-        <p className="text-sm text-red-400 text-center">{activeWhisper.error}</p>
+      {/* Error display with dismiss and retry */}
+      {showError && (
+        <div className="w-full rounded-lg border border-red-800/50 bg-red-900/20 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm text-red-400">{currentError}</p>
+            <button
+              onClick={() => setDismissedError(currentError)}
+              className="text-red-500 hover:text-red-300 text-xs shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="flex gap-2 mt-2">
+            {activeWhisper.error && recorder.audioBlob && (
+              <button
+                onClick={handleRetry}
+                className="text-xs px-3 py-1 rounded bg-red-800/50 text-red-300 hover:bg-red-800 transition-colors"
+              >
+                Retry
+              </button>
+            )}
+            {mode === 'api' && activeWhisper.error && (
+              <button
+                onClick={() => {
+                  setMode('browser');
+                  setDismissedError(currentError);
+                }}
+                className="text-xs px-3 py-1 rounded bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+              >
+                Try browser mode
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       <TranscriptDisplay
         text={activeWhisper.text}
         isProcessing={isProcessing}
-        modelProgress={'modelProgress' in whisperBrowser ? whisperBrowser.modelProgress : 0}
+        modelProgress={whisperBrowser.modelProgress}
         whisperState={activeWhisper.state}
       />
+
+      <p className="text-xs text-gray-600 text-center">
+        {mode === 'browser' ? 'Audio stays on your device' : 'Audio sent to OpenAI API'}
+        {' \u00B7 English only'}
+      </p>
     </div>
   );
 }

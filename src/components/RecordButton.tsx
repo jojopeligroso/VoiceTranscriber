@@ -1,3 +1,38 @@
-export default function RecordButton() {
-  return <div>RecordButton</div>;
+'use client';
+
+interface RecordButtonProps {
+  state: 'idle' | 'recording' | 'stopped';
+  onStart: () => void;
+  onStop: () => void;
+}
+
+export default function RecordButton({ state, onStart, onStop }: RecordButtonProps) {
+  const isRecording = state === 'recording';
+
+  return (
+    <button
+      onClick={isRecording ? onStop : onStart}
+      className={`
+        relative flex items-center justify-center
+        w-20 h-20 rounded-full transition-all duration-200
+        focus:outline-none focus:ring-2 focus:ring-offset-2
+        ${isRecording
+          ? 'bg-red-500 hover:bg-red-600 focus:ring-red-400 animate-pulse'
+          : 'bg-gray-700 hover:bg-gray-600 focus:ring-gray-500'
+        }
+      `}
+      aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+    >
+      {isRecording ? (
+        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <rect x="6" y="6" width="12" height="12" rx="2" />
+        </svg>
+      ) : (
+        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+        </svg>
+      )}
+    </button>
+  );
 }

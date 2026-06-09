@@ -199,11 +199,6 @@ export default function VoiceTranscriber({
   const whisperAPI = useWhisperAPI(apiEndpoint);
 
   const activeWhisper = mode === 'browser' ? whisperBrowser : whisperAPI;
-  const isProcessing =
-    whisperBrowser.state === 'loading-model' ||
-    whisperBrowser.state === 'transcribing' ||
-    whisperAPI.state === 'transcribing';
-
   const hasResult = activeWhisper.state === 'done' && !!activeWhisper.text;
   const hasAccumulatedText = !!accumulatedText;
   const modelReady = whisperBrowser.modelReady;
@@ -273,7 +268,7 @@ export default function VoiceTranscriber({
   return (
     <div className={`relative flex flex-col items-center gap-4 w-full max-w-md mx-auto px-4 py-2 sm:px-6 ${className ?? ''}`}>
       <ThemeToggle />
-      <h1 className="text-xl font-semibold text-[var(--fg)] text-center w-full">VoiceTranscriber</h1>
+      <h1 className="text-xl font-semibold text-[var(--fg)] text-center w-full" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>VoiceTranscriber</h1>
 
       {/* In-app browser warning */}
       {inApp && !inAppWarningDismissed && (
@@ -373,8 +368,6 @@ export default function VoiceTranscriber({
 
       <TranscriptDisplay
         text={accumulatedText}
-        isProcessing={isProcessing}
-        modelProgress={whisperBrowser.modelProgress}
         whisperState={activeWhisper.state}
         onClear={hasAccumulatedText ? handleClear : undefined}
         onTextChange={setAccumulatedText}

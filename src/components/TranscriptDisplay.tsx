@@ -4,8 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 
 interface TranscriptDisplayProps {
   text: string;
-  isProcessing: boolean;
-  modelProgress: number;
   whisperState: string;
   onClear?: () => void;
   onTextChange?: (text: string) => void;
@@ -49,8 +47,6 @@ function TrashIcon({ className }: { className?: string }) {
 
 export default function TranscriptDisplay({
   text,
-  isProcessing,
-  modelProgress,
   whisperState,
   onClear,
   onTextChange,

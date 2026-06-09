@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VoiceTranscriber
 
-## Getting Started
+Private voice-to-text web app. Record audio in the browser, transcribe it locally using Whisper or via the OpenAI API. No database, no accounts, no stored recordings.
 
-First, run the development server:
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How It Works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Click the mic button to record (max 2 minutes)
+2. Click stop
+3. Audio is transcribed automatically
+4. Edit the result if needed, then copy to clipboard
 
-## Learn More
+## Transcription Modes
 
-To learn more about Next.js, take a look at the following resources:
+| Mode | Privacy | Quality | Speed |
+|---|---|---|---|
+| **Browser** (default) | Audio never leaves your device | Good (Whisper tiny English) | ~40MB model download on first use |
+| **API** (opt-in) | Audio sent to OpenAI | Better (Whisper large) | Fast, requires API key |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+OPENAI_API_KEY=sk-...   # Optional. Enables API transcription mode.
+```
 
-## Deploy on Vercel
+Without `OPENAI_API_KEY`, the app runs in browser-only mode. The mode toggle is hidden.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Embedding the Component
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```tsx
+import { VoiceTranscriber } from './src';
+
+// Default: browser mode, 2-minute max
+<VoiceTranscriber />
+
+// Custom configuration
+<VoiceTranscriber
+  defaultMode="browser"
+  maxDuration={60}
+  apiEndpoint="/my-custom-endpoint"
+  className="my-custom-styles"
+/>
+```
+
+### Props
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `defaultMode` | `'browser' \| 'api'` | `'browser'` | Initial transcription mode |
+| `apiEndpoint` | `string` | `'/api/transcribe'` | Custom API endpoint for API mode |
+| `maxDuration` | `number` | `120` | Max recording duration in seconds |
+| `className` | `string` | `undefined` | Additional CSS classes for the container |
+
+### Requirements
+
+- React 19+
+- Tailwind CSS (component uses Tailwind utility classes)
+- `@huggingface/transformers` (peer dependency for browser mode)
+
+## Tech Stack
+
+- Next.js 15 (App Router)
+- TypeScript
+- Tailwind CSS
+- `@huggingface/transformers` (Whisper ONNX, browser-side)
+- `openai` SDK (API mode)
+
+## Privacy
+
+In browser mode, audio is processed entirely on your device using WebAssembly. Nothing is uploaded anywhere. In API mode, audio is sent to your own Vercel function, which forwards it to OpenAI. In both modes, audio exists only in memory during processing and is never persisted.

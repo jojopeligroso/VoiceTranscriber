@@ -10,14 +10,26 @@ import ModeToggle from './ModeToggle';
 
 type Mode = 'browser' | 'api';
 
-export default function VoiceTranscriber() {
+export interface VoiceTranscriberProps {
+  defaultMode?: Mode;
+  apiEndpoint?: string;
+  maxDuration?: number;
+  className?: string;
+}
+
+export default function VoiceTranscriber({
+  defaultMode = 'browser',
+  apiEndpoint,
+  maxDuration,
+  className,
+}: VoiceTranscriberProps = {}) {
   const apiAvailable = !!process.env.NEXT_PUBLIC_HAS_API_KEY;
-  const [mode, setMode] = useState<Mode>('browser');
+  const [mode, setMode] = useState<Mode>(defaultMode);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
 
-  const recorder = useAudioRecorder();
+  const recorder = useAudioRecorder(maxDuration);
   const whisperBrowser = useWhisperBrowser();
-  const whisperAPI = useWhisperAPI();
+  const whisperAPI = useWhisperAPI(apiEndpoint);
 
   const activeWhisper = mode === 'browser' ? whisperBrowser : whisperAPI;
   const isProcessing =
@@ -54,7 +66,7 @@ export default function VoiceTranscriber() {
   const showError = currentError && currentError !== dismissedError;
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto px-4 py-6 sm:px-6">
+    <div className={`flex flex-col items-center gap-6 w-full max-w-md mx-auto px-4 py-6 sm:px-6 ${className ?? ''}`}>
       <h1 className="text-2xl font-semibold text-gray-100">VoiceTranscriber</h1>
 
       <ModeToggle mode={mode} onChange={setMode} apiAvailable={apiAvailable} />
@@ -62,6 +74,7 @@ export default function VoiceTranscriber() {
       <AudioRecorder
         state={recorder.state}
         elapsedSeconds={recorder.elapsedSeconds}
+        maxDuration={maxDuration}
         onStart={handleStart}
         onStop={recorder.stop}
       />

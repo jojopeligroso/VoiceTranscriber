@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'stopped';
 
-const MAX_DURATION = 120; // 2 minutes
+const DEFAULT_MAX_DURATION = 120; // 2 minutes
 
 function getSupportedMimeType(): string {
   const types = [
@@ -18,7 +18,7 @@ function getSupportedMimeType(): string {
   return '';
 }
 
-export function useAudioRecorder() {
+export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
   const [state, setState] = useState<RecorderState>('idle');
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -78,7 +78,7 @@ export function useAudioRecorder() {
       timerRef.current = setInterval(() => {
         seconds++;
         setElapsedSeconds(seconds);
-        if (seconds >= MAX_DURATION) {
+        if (seconds >= maxDuration) {
           recorder.stop();
         }
       }, 1000);

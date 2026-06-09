@@ -5,6 +5,7 @@ import RecordButton from './RecordButton';
 interface AudioRecorderProps {
   state: 'idle' | 'recording' | 'stopped';
   elapsedSeconds: number;
+  maxDuration?: number;
   onStart: () => void;
   onStop: () => void;
 }
@@ -15,11 +16,9 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const MAX_DURATION = 120;
-
-export default function AudioRecorder({ state, elapsedSeconds, onStart, onStop }: AudioRecorderProps) {
-  const remaining = MAX_DURATION - elapsedSeconds;
-  const progress = (elapsedSeconds / MAX_DURATION) * 100;
+export default function AudioRecorder({ state, elapsedSeconds, maxDuration = 120, onStart, onStop }: AudioRecorderProps) {
+  const remaining = maxDuration - elapsedSeconds;
+  const progress = (elapsedSeconds / maxDuration) * 100;
   const isRecording = state === 'recording';
 
   return (
@@ -31,7 +30,7 @@ export default function AudioRecorder({ state, elapsedSeconds, onStart, onStop }
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span>Recording {formatTime(elapsedSeconds)}</span>
-            <span className="text-gray-600">/ {formatTime(MAX_DURATION)}</span>
+            <span className="text-gray-600">/ {formatTime(maxDuration)}</span>
           </div>
           <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
             <div

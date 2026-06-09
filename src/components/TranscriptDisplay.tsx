@@ -7,6 +7,7 @@ interface TranscriptDisplayProps {
   isProcessing: boolean;
   modelProgress: number;
   whisperState: string;
+  onClear?: () => void;
 }
 
 function PenIcon({ className }: { className?: string }) {
@@ -35,11 +36,22 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  );
+}
+
 export default function TranscriptDisplay({
   text,
   isProcessing,
   modelProgress,
   whisperState,
+  onClear,
 }: TranscriptDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(text);
@@ -80,12 +92,23 @@ export default function TranscriptDisplay({
 
   return (
     <div className="w-full">
-      <div className="relative w-full min-h-[120px] rounded-lg border border-gray-700 bg-gray-800/50">
+      <div
+        className={`relative w-full min-h-[160px] rounded-lg border transition-colors ${
+          isEditing
+            ? 'border-blue-500/50 bg-gray-800/70'
+            : hasText
+              ? 'border-gray-700 bg-gray-800/50 cursor-text'
+              : 'border-gray-700 bg-gray-800/50'
+        }`}
+        onClick={() => {
+          if (hasText && !isEditing) setIsEditing(true);
+        }}
+      >
         {/* Action buttons */}
         {hasText && (
-          <div className="absolute top-2 right-2 flex gap-1">
+          <div className="absolute top-2 right-2 flex gap-1 z-10">
             <button
-              onClick={() => setIsEditing(!isEditing)}
+              onClick={(e) => { e.stopPropagation(); setIsEditing(!isEditing); }}
               className={`p-1.5 rounded-md transition-colors ${
                 isEditing
                   ? 'bg-blue-500/20 text-blue-400'
@@ -96,7 +119,7 @@ export default function TranscriptDisplay({
               <PenIcon className="w-4 h-4" />
             </button>
             <button
-              onClick={handleCopy}
+              onClick={(e) => { e.stopPropagation(); handleCopy(); }}
               className="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors"
               title="Copy to clipboard"
             >
@@ -106,12 +129,21 @@ export default function TranscriptDisplay({
                 <CopyIcon className="w-4 h-4" />
               )}
             </button>
+            {onClear && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onClear(); }}
+                className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-gray-700 transition-colors"
+                title="Clear transcript"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            )}
           </div>
         )}
 
         {/* Copied feedback */}
         {copied && (
-          <div className="absolute top-2 right-20 text-xs text-green-400 bg-gray-800 px-2 py-1 rounded">
+          <div className="absolute top-2 right-24 text-xs text-green-400 bg-gray-800 px-2 py-1 rounded z-10">
             Copied!
           </div>
         )}
@@ -121,12 +153,12 @@ export default function TranscriptDisplay({
             ref={textareaRef}
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
-            className="w-full min-h-[120px] bg-transparent text-gray-200 p-4 pr-20 resize-y focus:outline-none"
+            className="w-full min-h-[160px] bg-transparent text-gray-200 p-4 pr-24 resize-y focus:outline-none"
           />
         ) : hasText ? (
-          <p className="text-gray-200 whitespace-pre-wrap p-4 pr-20">{displayText}</p>
+          <p className="text-gray-200 whitespace-pre-wrap p-4 pr-24">{displayText}</p>
         ) : (
-          <div className="flex items-center justify-center min-h-[120px]">
+          <div className="flex items-center justify-center min-h-[160px]">
             <p className="text-sm text-gray-500 italic">
               Your transcription will appear here
             </p>

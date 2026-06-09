@@ -13,6 +13,7 @@ Private voice-to-text dictation tool. Record audio in the browser, transcribe lo
 - **Get Ready** — Pre-recording step where the user triggers the one-time model download. Mic button only appears after the model is loaded.
 - **Instructions panel** — Collapsible panel in the UI explaining: model in use, step-by-step guide, realistic recording limits, and expected wait times. Essential because the component will be embedded in other apps where end users (not developers) need to understand the flow.
 - **Chunked processing** — Whisper processes audio in 30-second windows. Without chunking, only the first ~30s is transcribed. The pipeline must use `chunk_length_s` and `stride_length_s` to split longer audio into overlapping segments and stitch text together.
+- **In-app browser** — Ephemeral WebViews (Telegram, WhatsApp, Instagram, etc.) don't persist Cache API, so the ~150MB model re-downloads every visit. The app detects in-app browsers and shows a one-time warning suggesting the user open their default browser. No forced API mode, no workarounds — if they ignore the warning, that's on them.
 
 ## Privacy Model
 

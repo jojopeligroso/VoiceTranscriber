@@ -10,6 +10,13 @@ import ModeToggle from './ModeToggle';
 
 type Mode = 'browser' | 'api';
 
+function isInAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // Common in-app browser identifiers
+  return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -88,6 +95,8 @@ export default function VoiceTranscriber({
   const apiAvailable = !!process.env.NEXT_PUBLIC_HAS_API_KEY;
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const [inAppWarningDismissed, setInAppWarningDismissed] = useState(false);
+  const inApp = isInAppBrowser();
 
   const recorder = useAudioRecorder(maxDuration);
   const whisperBrowser = useWhisperBrowser();
@@ -153,6 +162,24 @@ export default function VoiceTranscriber({
   return (
     <div className={`flex flex-col items-center gap-6 w-full max-w-md mx-auto px-4 py-6 sm:px-6 ${className ?? ''}`}>
       <h1 className="text-2xl font-semibold text-gray-100">VoiceTranscriber</h1>
+
+      {/* In-app browser warning */}
+      {inApp && !inAppWarningDismissed && (
+        <div className="w-full rounded-lg border border-amber-800/50 bg-amber-900/20 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm text-amber-300">
+              You're in an in-app browser. The speech model (~150 MB) will need to re-download each visit.
+              For the best experience, open this page in your default browser.
+            </p>
+            <button
+              onClick={() => setInAppWarningDismissed(true)}
+              className="text-amber-500 hover:text-amber-300 text-xs shrink-0 mt-0.5"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       <ModeToggle mode={mode} onChange={setMode} apiAvailable={apiAvailable} />
 
@@ -232,6 +259,7 @@ export default function VoiceTranscriber({
         isProcessing={isProcessing}
         modelProgress={whisperBrowser.modelProgress}
         whisperState={activeWhisper.state}
+        onClear={hasResult ? handleNewRecording : undefined}
       />
 
       {hasResult && (

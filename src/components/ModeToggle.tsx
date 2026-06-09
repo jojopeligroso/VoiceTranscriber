@@ -12,13 +12,13 @@ export default function ModeToggle({ mode, onChange, apiAvailable }: ModeToggleP
   if (!apiAvailable) return null;
 
   return (
-    <div className="flex rounded-lg bg-gray-800 p-1 text-sm">
+    <div className="flex rounded-lg bg-[var(--surface)] p-1 text-sm">
       <button
         onClick={() => onChange('browser')}
         className={`px-3 py-1.5 rounded-md transition-colors ${
           mode === 'browser'
-            ? 'bg-gray-600 text-white'
-            : 'text-gray-400 hover:text-gray-200'
+            ? 'bg-[var(--accent)] text-[#05182e]'
+            : 'text-[var(--muted)] hover:text-[var(--fg)]'
         }`}
       >
         Browser (private)
@@ -27,8 +27,8 @@ export default function ModeToggle({ mode, onChange, apiAvailable }: ModeToggleP
         onClick={() => onChange('api')}
         className={`px-3 py-1.5 rounded-md transition-colors ${
           mode === 'api'
-            ? 'bg-gray-600 text-white'
-            : 'text-gray-400 hover:text-gray-200'
+            ? 'bg-[var(--accent)] text-[#05182e]'
+            : 'text-[var(--muted)] hover:text-[var(--fg)]'
         }`}
       >
         API (OpenAI)

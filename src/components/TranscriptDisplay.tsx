@@ -61,7 +61,6 @@ export default function TranscriptDisplay({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync external text changes; exit edit mode if text is cleared
   useEffect(() => {
     if (!text) {
       setIsEditing(false);
@@ -71,7 +70,6 @@ export default function TranscriptDisplay({
     }
   }, [text, isEditing]);
 
-  // Auto-focus textarea when entering edit mode
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
@@ -82,7 +80,6 @@ export default function TranscriptDisplay({
     }
   }, [isEditing]);
 
-  // Click outside to exit edit mode
   useEffect(() => {
     if (!isEditing) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -103,7 +100,6 @@ export default function TranscriptDisplay({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Auto-scroll to bottom when new text is appended
   const prevTextLenRef = useRef(0);
   useEffect(() => {
     if (text && text.length > prevTextLenRef.current && containerRef.current) {
@@ -112,7 +108,6 @@ export default function TranscriptDisplay({
     prevTextLenRef.current = text?.length ?? 0;
   }, [text]);
 
-  // Hide during loading/transcribing only if there's no accumulated text to show
   if ((whisperState === 'loading-model' || whisperState === 'transcribing') && !text) {
     return null;
   }
@@ -123,12 +118,12 @@ export default function TranscriptDisplay({
   return (
     <div className="w-full" ref={containerRef}>
       <div
-        className={`relative w-full min-h-[300px] sm:min-h-[360px] rounded-lg border transition-colors ${
+        className={`relative w-full min-h-[240px] sm:min-h-[320px] rounded-lg border transition-colors ${
           isEditing
-            ? 'border-blue-500/50 bg-gray-800/70'
+            ? 'border-[var(--accent)]/50 bg-[var(--bg-alt)]'
             : hasText
-              ? 'border-gray-700 bg-gray-800/50 cursor-text'
-              : 'border-gray-700 bg-gray-800/50'
+              ? 'border-[var(--surface-alt)] bg-[var(--bg-alt)] cursor-text'
+              : 'border-[var(--surface-alt)] bg-[var(--bg-alt)]'
         }`}
         onClick={() => {
           if (hasText && !isEditing) setIsEditing(true);
@@ -145,8 +140,8 @@ export default function TranscriptDisplay({
               }}
               className={`p-1.5 rounded-md transition-colors ${
                 isEditing
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-700'
+                  ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
+                  : 'text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)]'
               }`}
               title={isEditing ? 'Done editing' : 'Edit text'}
             >
@@ -154,11 +149,11 @@ export default function TranscriptDisplay({
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleCopy(); }}
-              className="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-700 transition-colors"
+              className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
               title="Copy to clipboard"
             >
               {copied ? (
-                <CheckIcon className="w-4 h-4 text-green-400" />
+                <CheckIcon className="w-4 h-4 text-[var(--teal)]" />
               ) : (
                 <CopyIcon className="w-4 h-4" />
               )}
@@ -166,7 +161,7 @@ export default function TranscriptDisplay({
             {onClear && (
               <button
                 onClick={(e) => { e.stopPropagation(); onClear(); }}
-                className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-gray-700 transition-colors"
+                className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
                 title="Clear transcript"
               >
                 <TrashIcon className="w-4 h-4" />
@@ -177,7 +172,7 @@ export default function TranscriptDisplay({
 
         {/* Copied feedback */}
         {copied && (
-          <div className="absolute top-2 right-28 text-xs text-green-400 bg-gray-800 px-2 py-1 rounded z-10">
+          <div className="absolute top-2 right-28 text-xs text-[var(--teal)] bg-[var(--surface)] px-2 py-1 rounded z-10">
             Copied!
           </div>
         )}
@@ -187,13 +182,13 @@ export default function TranscriptDisplay({
             ref={textareaRef}
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
-            className="w-full min-h-[300px] sm:min-h-[360px] bg-transparent text-gray-200 text-base p-4 pr-28 resize-y focus:outline-none"
+            className="w-full min-h-[240px] sm:min-h-[320px] bg-transparent text-[var(--fg)] text-base p-4 pr-28 resize-y focus:outline-none"
           />
         ) : hasText ? (
-          <p className="text-gray-200 text-base whitespace-pre-wrap p-4 pr-28">{displayText}</p>
+          <p className="text-[var(--fg)] text-base whitespace-pre-wrap p-4 pr-28">{displayText}</p>
         ) : (
-          <div className="flex items-center justify-center min-h-[300px] sm:min-h-[360px]">
-            <p className="text-sm text-gray-500 italic">
+          <div className="flex items-center justify-center min-h-[240px] sm:min-h-[320px]">
+            <p className="text-sm text-[var(--muted)] italic">
               Your transcription will appear here
             </p>
           </div>

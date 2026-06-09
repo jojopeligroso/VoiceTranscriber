@@ -8,13 +8,13 @@ import type { TranscriptionResult } from '@/lib/transcribe';
 import AudioRecorder from './AudioRecorder';
 import TranscriptDisplay from './TranscriptDisplay';
 import ModeToggle from './ModeToggle';
+import ThemeToggle from './ThemeToggle';
 
 type Mode = 'browser' | 'api';
 
 function isInAppBrowser(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
-  // Common in-app browser identifiers
   return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
 }
 
@@ -28,26 +28,26 @@ function ModelDownloadProgress({ progress, files }: { progress: number; files: F
   const [showDetails, setShowDetails] = useState(false);
 
   return (
-    <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+    <div className="w-full rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-5">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-200">Preparing speech engine</p>
-          <span className="text-sm tabular-nums text-gray-400">{progress}%</span>
+          <p className="text-sm font-medium text-[var(--fg)]">Preparing speech engine</p>
+          <span className="text-sm tabular-nums text-[var(--muted)]">{progress}%</span>
         </div>
-        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-[var(--surface-alt)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+            className="h-full bg-[var(--teal)] rounded-full transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-[var(--muted)]">
             One-time download. Cached for future use.
           </p>
           {files.length > 0 && (
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+              className="text-xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors flex items-center gap-1"
             >
               {files.length} files
               <svg
@@ -63,12 +63,12 @@ function ModelDownloadProgress({ progress, files }: { progress: number; files: F
           )}
         </div>
         {showDetails && files.length > 0 && (
-          <div className="flex flex-col gap-1.5 pt-1 border-t border-gray-700/50">
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--surface-alt)]">
             {files.map((f) => (
               <div key={f.name} className="flex items-center gap-2 text-xs">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${f.done ? 'bg-green-500' : 'bg-blue-500 animate-pulse'}`} />
-                <span className="text-gray-400 truncate flex-1">{f.name}</span>
-                <span className="text-gray-500 tabular-nums shrink-0">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${f.done ? 'bg-[var(--teal)]' : 'bg-[var(--accent)] animate-pulse'}`} />
+                <span className="text-[var(--muted)] truncate flex-1">{f.name}</span>
+                <span className="text-[var(--muted)] tabular-nums shrink-0">
                   {formatBytes(f.loaded)} / {formatBytes(f.total)}
                 </span>
               </div>
@@ -85,10 +85,10 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
   const [showTechnical, setShowTechnical] = useState(false);
 
   return (
-    <div className="w-full text-xs text-gray-500">
+    <div className="w-full text-xs text-[var(--muted)]">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-center gap-1.5 py-1 hover:text-gray-400 transition-colors"
+        className="w-full flex items-center justify-center gap-1.5 py-1 hover:text-[var(--fg)] transition-colors"
       >
         <span>Tips & info</span>
         <svg
@@ -100,24 +100,24 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
       </button>
 
       {expanded && (
-        <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-400 space-y-4">
+        <div className="mt-2 rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-4 text-sm text-[var(--muted)] space-y-4">
           <div>
-            <p className="font-medium text-gray-300 mb-1.5">How it works</p>
+            <p className="font-medium text-[var(--accent)] mb-1.5">How it works</p>
             <ol className="list-decimal list-inside space-y-1">
-              <li><strong>Tap Get Ready</strong> — allow microphone access when prompted</li>
-              <li><strong>Speak clearly</strong> — the app records audio locally on your device</li>
-              <li><strong>Tap Stop</strong> — transcription begins automatically</li>
-              <li><strong>Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
-              <li><strong>Record more</strong> — each clip's text is added to your document. Record as many clips as you need.</li>
-              <li><strong>Edit if needed</strong> — tap the text to make corrections</li>
-              <li><strong>Copy</strong> — tap the copy icon to grab your text</li>
+              <li><strong className="text-[var(--fg)]">Tap Get Ready</strong> — allow microphone access when prompted</li>
+              <li><strong className="text-[var(--fg)]">Speak clearly</strong> — the app records audio locally on your device</li>
+              <li><strong className="text-[var(--fg)]">Tap Stop</strong> — transcription begins automatically</li>
+              <li><strong className="text-[var(--fg)]">Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
+              <li><strong className="text-[var(--fg)]">Record more</strong> — each clip's text is added to your document. Record as many clips as you need.</li>
+              <li><strong className="text-[var(--fg)]">Edit if needed</strong> — tap the text to make corrections</li>
+              <li><strong className="text-[var(--fg)]">Copy</strong> — tap the copy icon to grab your text</li>
             </ol>
           </div>
 
           <div>
-            <p className="font-medium text-gray-300 mb-1.5">Best results</p>
+            <p className="font-medium text-[var(--accent)] mb-1.5">Best results</p>
             <ul className="space-y-1">
-              <li><strong>Keep recordings under 30 seconds</strong> for best accuracy</li>
+              <li><strong className="text-[var(--fg)]">Keep recordings under 30 seconds</strong> for best accuracy</li>
               <li>Maximum recording length is 2 minutes (auto-stops)</li>
               <li>For longer content, record multiple short clips — each one appends to your text automatically</li>
               <li>Speak at a natural pace — no need to slow down</li>
@@ -127,9 +127,9 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
           </div>
 
           <div>
-            <p className="font-medium text-gray-300 mb-1.5">About the model</p>
+            <p className="font-medium text-[var(--accent)] mb-1.5">About the model</p>
             <ul className="space-y-1">
-              <li>Uses <strong>Whisper Tiny English</strong> — a small speech recognition model that runs entirely in your browser</li>
+              <li>Uses <strong className="text-[var(--fg)]">Whisper Tiny English</strong> — a small speech recognition model that runs entirely in your browser</li>
               <li>Audio never leaves your device</li>
               <li>~40 MB model downloads once, then cached for future visits</li>
               <li>Best for: short dictation, quick notes, voice memos</li>
@@ -137,10 +137,10 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
             </ul>
           </div>
 
-          <div className="border-t border-gray-700/50 pt-3">
+          <div className="border-t border-[var(--surface-alt)] pt-3">
             <button
               onClick={() => setShowTechnical(!showTechnical)}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
             >
               <span>Technical details</span>
               <svg
@@ -152,7 +152,7 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
             </button>
             {showTechnical && (
               <ul className="mt-2 space-y-1">
-                <li>Model: <code className="text-gray-300">onnx-community/whisper-tiny.en</code> (fp32, WASM)</li>
+                <li>Model: <code className="text-[var(--accent)]">onnx-community/whisper-tiny.en</code> (fp32, WASM)</li>
                 <li>Audio: 16 kHz mono, processed in 28-second chunks</li>
                 <li>Works in Chrome, Firefox, Edge. Safari has limited support.</li>
                 <li>In-app browsers (Telegram, WhatsApp) may not work — use your default browser</li>
@@ -161,7 +161,7 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
           </div>
 
           {lastResult && (
-            <div className="pt-2 border-t border-gray-700/50 text-gray-600 tabular-nums">
+            <div className="pt-2 border-t border-[var(--surface-alt)] text-[var(--muted)] tabular-nums">
               Last: {lastResult.audioDurationS}s audio
               {' \u00B7 '}{lastResult.chunks} chunk{lastResult.chunks !== 1 ? 's' : ''}
               {' \u00B7 '}{(lastResult.durationMs / 1000).toFixed(1)}s processing
@@ -208,21 +208,16 @@ export default function VoiceTranscriber({
   const hasAccumulatedText = !!accumulatedText;
   const modelReady = whisperBrowser.modelReady;
 
-  // Show recorder when: model ready (browser) or API mode, AND idle or recording
   const showRecorder =
     (mode === 'api' || modelReady) &&
     (recorder.state === 'idle' || recorder.state === 'recording');
 
-  // Auto-transcribe when recording stops.
-  // Safe from race conditions because handleStart calls recorder.reset()
-  // (clearing audioBlob + setting state to idle) before resetting whisper.
   useEffect(() => {
     if (recorder.state === 'stopped' && recorder.audioBlob && activeWhisper.state === 'idle') {
       activeWhisper.transcribe(recorder.audioBlob);
     }
   }, [recorder.state, recorder.audioBlob, activeWhisper]);
 
-  // Append new transcription to accumulated text
   useEffect(() => {
     const newText = activeWhisper.text;
     if (newText && newText !== prevWhisperTextRef.current) {
@@ -240,8 +235,6 @@ export default function VoiceTranscriber({
 
   const handleStart = () => {
     setDismissedError(null);
-    // Reset recorder FIRST — clears audioBlob and sets state to idle,
-    // preventing the useEffect from re-triggering on stale data
     recorder.reset();
     whisperBrowser.reset();
     whisperAPI.reset();
@@ -278,20 +271,24 @@ export default function VoiceTranscriber({
   const showError = currentError && currentError !== dismissedError;
 
   return (
-    <div className={`flex flex-col items-center gap-6 w-full max-w-md mx-auto px-4 py-6 sm:px-6 ${className ?? ''}`}>
-      <h1 className="text-2xl font-semibold text-gray-100">VoiceTranscriber</h1>
+    <div className={`flex flex-col items-center gap-4 w-full max-w-md mx-auto px-4 py-6 sm:px-6 ${className ?? ''}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between w-full">
+        <h1 className="text-xl font-semibold text-[var(--fg)]">VoiceTranscriber</h1>
+        <ThemeToggle />
+      </div>
 
       {/* In-app browser warning */}
       {inApp && !inAppWarningDismissed && (
-        <div className="w-full rounded-lg border border-amber-800/50 bg-amber-900/20 p-3">
+        <div className="w-full rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm text-amber-300">
+            <p className="text-sm text-[var(--accent)]">
               You're in an in-app browser. The speech model (~150 MB) will need to re-download each visit.
               For the best experience, open this page in your default browser.
             </p>
             <button
               onClick={() => setInAppWarningDismissed(true)}
-              className="text-amber-500 hover:text-amber-300 text-xs shrink-0 mt-0.5"
+              className="text-[var(--accent)] opacity-70 hover:opacity-100 text-xs shrink-0 mt-0.5"
             >
               Got it
             </button>
@@ -305,7 +302,7 @@ export default function VoiceTranscriber({
       {mode === 'browser' && !modelReady && whisperBrowser.state === 'idle' && (
         <button
           onClick={handleGetReady}
-          className="flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-500 transition-colors"
+          className="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--accent)] text-[#05182e] font-medium hover:opacity-90 transition-opacity"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" />
@@ -333,12 +330,12 @@ export default function VoiceTranscriber({
       )}
 
       {showError && (
-        <div className="w-full rounded-lg border border-red-800/50 bg-red-900/20 p-3">
+        <div className="w-full rounded-lg border border-[var(--red)]/30 bg-[var(--red)]/10 p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm text-red-400">{currentError}</p>
+            <p className="text-sm text-[var(--red)]">{currentError}</p>
             <button
               onClick={() => setDismissedError(currentError)}
-              className="text-red-500 hover:text-red-300 text-xs shrink-0"
+              className="text-[var(--red)] opacity-70 hover:opacity-100 text-xs shrink-0"
             >
               Dismiss
             </button>
@@ -347,14 +344,14 @@ export default function VoiceTranscriber({
             {activeWhisper.error && recorder.audioBlob && (
               <button
                 onClick={handleRetry}
-                className="text-xs px-3 py-1 rounded bg-red-800/50 text-red-300 hover:bg-red-800 transition-colors"
+                className="text-xs px-3 py-1 rounded bg-[var(--red)]/20 text-[var(--red)] hover:bg-[var(--red)]/30 transition-colors"
               >
                 Retry
               </button>
             )}
             <button
               onClick={handleNewRecording}
-              className="text-xs px-3 py-1 rounded bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+              className="text-xs px-3 py-1 rounded bg-[var(--surface)] text-[var(--fg)] hover:bg-[var(--surface-alt)] transition-colors"
             >
               New recording
             </button>
@@ -364,13 +361,13 @@ export default function VoiceTranscriber({
 
       {/* Transcribing spinner */}
       {activeWhisper.state === 'transcribing' && (
-        <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+        <div className="w-full rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-3">
-            <svg className="w-5 h-5 shrink-0 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none">
+            <svg className="w-5 h-5 shrink-0 animate-spin text-[var(--teal)]" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <p className="text-sm text-gray-300">Transcribing audio...</p>
+            <p className="text-sm text-[var(--fg)]">Transcribing audio...</p>
           </div>
         </div>
       )}
@@ -387,7 +384,7 @@ export default function VoiceTranscriber({
       {hasResult && (
         <button
           onClick={handleNewRecording}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--surface)] text-sm text-[var(--fg)] hover:bg-[var(--surface-alt)] transition-colors"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />

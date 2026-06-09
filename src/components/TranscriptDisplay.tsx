@@ -72,24 +72,35 @@ export default function TranscriptDisplay({
 
   if (whisperState === 'loading-model') {
     return (
-      <div className="w-full flex flex-col items-center gap-2">
-        <p className="text-sm text-gray-400">Downloading Whisper model...</p>
-        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-300"
-            style={{ width: `${modelProgress}%` }}
-          />
+      <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-200">Downloading speech model</p>
+            <span className="text-sm tabular-nums text-gray-400">{modelProgress}%</span>
+          </div>
+          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${modelProgress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            {modelProgress < 100
+              ? 'One-time download (~40 MB). Cached for future use.'
+              : 'Model ready. Starting transcription...'}
+          </p>
         </div>
-        <p className="text-xs text-gray-500">{modelProgress}%</p>
       </div>
     );
   }
 
   if (whisperState === 'transcribing') {
     return (
-      <div className="w-full flex flex-col items-center gap-2">
-        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm text-gray-400">Transcribing...</p>
+      <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0" />
+          <p className="text-sm text-gray-300">Transcribing audio...</p>
+        </div>
       </div>
     );
   }

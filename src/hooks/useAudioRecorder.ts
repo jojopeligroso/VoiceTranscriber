@@ -42,6 +42,8 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
   }, []);
 
   const start = useCallback(async () => {
+    cleanup();
+    setState('idle');
     setError(null);
     setAudioBlob(null);
     setElapsedSeconds(0);

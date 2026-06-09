@@ -8,6 +8,7 @@ interface TranscriptDisplayProps {
   modelProgress: number;
   whisperState: string;
   onClear?: () => void;
+  onTextChange?: (text: string) => void;
 }
 
 function PenIcon({ className }: { className?: string }) {
@@ -52,6 +53,7 @@ export default function TranscriptDisplay({
   modelProgress,
   whisperState,
   onClear,
+  onTextChange,
 }: TranscriptDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(text);
@@ -85,6 +87,7 @@ export default function TranscriptDisplay({
     if (!isEditing) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        if (onTextChange && editedText !== text) onTextChange(editedText);
         setIsEditing(false);
       }
     };
@@ -100,8 +103,17 @@ export default function TranscriptDisplay({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // Loading and transcribing states are handled by VoiceTranscriber directly
-  if (whisperState === 'loading-model' || whisperState === 'transcribing') {
+  // Auto-scroll to bottom when new text is appended
+  const prevTextLenRef = useRef(0);
+  useEffect(() => {
+    if (text && text.length > prevTextLenRef.current && containerRef.current) {
+      containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    prevTextLenRef.current = text?.length ?? 0;
+  }, [text]);
+
+  // Hide during loading/transcribing only if there's no accumulated text to show
+  if ((whisperState === 'loading-model' || whisperState === 'transcribing') && !text) {
     return null;
   }
 
@@ -126,7 +138,11 @@ export default function TranscriptDisplay({
         {hasText && (
           <div className="absolute top-2 right-2 flex gap-1 z-10">
             <button
-              onClick={(e) => { e.stopPropagation(); setIsEditing(!isEditing); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isEditing && onTextChange && editedText !== text) onTextChange(editedText);
+                setIsEditing(!isEditing);
+              }}
               className={`p-1.5 rounded-md transition-colors ${
                 isEditing
                   ? 'bg-blue-500/20 text-blue-400'

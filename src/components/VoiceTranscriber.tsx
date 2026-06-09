@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useWhisperBrowser, type FileProgress } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
@@ -108,6 +108,7 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
               <li><strong>Speak clearly</strong> — the app records audio locally on your device</li>
               <li><strong>Tap Stop</strong> — transcription begins automatically</li>
               <li><strong>Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
+              <li><strong>Record more</strong> — each clip's text is added to your document. Record as many clips as you need.</li>
               <li><strong>Edit if needed</strong> — tap the text to make corrections</li>
               <li><strong>Copy</strong> — tap the copy icon to grab your text</li>
             </ol>
@@ -118,7 +119,7 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
             <ul className="space-y-1">
               <li><strong>Keep recordings under 30 seconds</strong> for best accuracy</li>
               <li>Maximum recording length is 2 minutes (auto-stops)</li>
-              <li>For longer content, record in multiple short clips rather than one long take</li>
+              <li>For longer content, record multiple short clips — each one appends to your text automatically</li>
               <li>Speak at a natural pace — no need to slow down</li>
               <li>Minimize background noise</li>
               <li>One speaker at a time</li>
@@ -189,6 +190,8 @@ export default function VoiceTranscriber({
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [inAppWarningDismissed, setInAppWarningDismissed] = useState(false);
+  const [accumulatedText, setAccumulatedText] = useState('');
+  const prevWhisperTextRef = useRef('');
   const inApp = isInAppBrowser();
 
   const recorder = useAudioRecorder(maxDuration);
@@ -202,6 +205,7 @@ export default function VoiceTranscriber({
     whisperAPI.state === 'transcribing';
 
   const hasResult = activeWhisper.state === 'done' && !!activeWhisper.text;
+  const hasAccumulatedText = !!accumulatedText;
   const modelReady = whisperBrowser.modelReady;
 
   // Show recorder when: model ready (browser) or API mode, AND idle or recording
@@ -217,6 +221,18 @@ export default function VoiceTranscriber({
       activeWhisper.transcribe(recorder.audioBlob);
     }
   }, [recorder.state, recorder.audioBlob, activeWhisper]);
+
+  // Append new transcription to accumulated text
+  useEffect(() => {
+    const newText = activeWhisper.text;
+    if (newText && newText !== prevWhisperTextRef.current) {
+      setAccumulatedText(prev => prev ? prev + '\n' + newText : newText);
+      prevWhisperTextRef.current = newText;
+    }
+    if (!newText) {
+      prevWhisperTextRef.current = '';
+    }
+  }, [activeWhisper.text]);
 
   const handleGetReady = () => {
     whisperBrowser.loadModel();
@@ -234,6 +250,15 @@ export default function VoiceTranscriber({
 
   const handleNewRecording = () => {
     setDismissedError(null);
+    recorder.reset();
+    whisperBrowser.reset();
+    whisperAPI.reset();
+  };
+
+  const handleClear = () => {
+    setDismissedError(null);
+    setAccumulatedText('');
+    prevWhisperTextRef.current = '';
     recorder.reset();
     whisperBrowser.reset();
     whisperAPI.reset();
@@ -351,11 +376,12 @@ export default function VoiceTranscriber({
       )}
 
       <TranscriptDisplay
-        text={activeWhisper.text}
+        text={accumulatedText}
         isProcessing={isProcessing}
         modelProgress={whisperBrowser.modelProgress}
         whisperState={activeWhisper.state}
-        onClear={hasResult ? handleNewRecording : undefined}
+        onClear={hasAccumulatedText ? handleClear : undefined}
+        onTextChange={setAccumulatedText}
       />
 
       {hasResult && (

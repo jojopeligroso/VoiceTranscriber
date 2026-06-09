@@ -5,10 +5,10 @@ Private voice-to-text dictation tool. Record audio in the browser, transcribe lo
 ## Glossary
 
 - **Dictation** — The primary use case. User speaks for 30s-3min to produce text they'll paste elsewhere (messages, docs, emails). Not quick voice notes; not meeting transcription.
-- **Browser mode** — Default transcription mode. Audio is processed entirely on-device via Whisper ONNX (WebAssembly). Nothing leaves the browser. Realistic quality limit: ~2-3 minutes. Beyond that, Whisper tiny drops words or cuts off mid-sentence.
+- **Browser mode** — Default transcription mode. Audio is processed entirely on-device via Whisper ONNX (WebAssembly). Nothing leaves the browser. Hard cap: 2 minutes (auto-stops). Best accuracy under 30 seconds. Beyond that, Whisper tiny degrades — record multiple short clips instead.
 - **API mode** — Opt-in transcription mode. Audio sent to a Vercel API route which proxies to OpenAI Whisper API. Higher quality, handles longer recordings (up to 25 min). Requires `OPENAI_API_KEY`.
 - **Auto-switch** — Two-stage behaviour when a recording approaches browser mode's practical limit. Stage 1 (warning): a non-intrusive banner appears during recording as the limit approaches ("Longer recordings need API for best results"). Stage 2 (consent): after the user stops, a prompt asks permission before sending audio to the API ("This recording is longer than browser mode handles well. Send to API for better results?"). Audio is never sent off-device without explicit consent. Exact trigger thresholds TBD via user testing.
-- **Soft cap** — The UI shows a recommended recording duration (~2-3 min in browser mode) but does not force-stop the recording. The cap is guidance, not enforcement.
+- **Hard cap** — Recording auto-stops at 2 minutes. The recommended duration for best accuracy is under 30 seconds. The timer turns amber after 30s as a gentle signal.
 - **Model** — `onnx-community/whisper-tiny.en` (English-only, ~150MB fp32). Downloaded once on first use, cached in browser IndexedDB. Runs via WASM on main thread.
 - **Get Ready** — Pre-recording step where the user triggers the one-time model download. Mic button only appears after the model is loaded.
 - **Instructions panel** — Collapsible panel in the UI explaining: model in use, step-by-step guide, realistic recording limits, and expected wait times. Essential because the component will be embedded in other apps where end users (not developers) need to understand the flow.

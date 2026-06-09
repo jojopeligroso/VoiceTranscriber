@@ -111,7 +111,7 @@ export default function TranscriptDisplay({
   return (
     <div className="w-full" ref={containerRef}>
       <div
-        className={`relative w-full min-h-[160px] rounded-lg border transition-colors ${
+        className={`relative w-full min-h-[300px] sm:min-h-[360px] rounded-lg border transition-colors ${
           isEditing
             ? 'border-blue-500/50 bg-gray-800/70'
             : hasText
@@ -171,12 +171,12 @@ export default function TranscriptDisplay({
             ref={textareaRef}
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
-            className="w-full min-h-[160px] bg-transparent text-gray-200 text-base p-4 pr-28 resize-y focus:outline-none"
+            className="w-full min-h-[300px] sm:min-h-[360px] bg-transparent text-gray-200 text-base p-4 pr-28 resize-y focus:outline-none"
           />
         ) : hasText ? (
           <p className="text-gray-200 text-base whitespace-pre-wrap p-4 pr-28">{displayText}</p>
         ) : (
-          <div className="flex items-center justify-center min-h-[160px]">
+          <div className="flex items-center justify-center min-h-[300px] sm:min-h-[360px]">
             <p className="text-sm text-gray-500 italic">
               Your transcription will appear here
             </p>

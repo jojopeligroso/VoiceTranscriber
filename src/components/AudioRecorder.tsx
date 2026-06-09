@@ -29,13 +29,15 @@ export default function AudioRecorder({ state, elapsedSeconds, maxDuration = 120
         <div className="flex flex-col items-center gap-2 w-full max-w-xs">
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span>Recording {formatTime(elapsedSeconds)}</span>
+            <span className={elapsedSeconds >= 30 && remaining > 10 ? 'text-amber-400' : ''}>
+              Recording {formatTime(elapsedSeconds)}
+            </span>
             <span className="text-gray-600">/ {formatTime(maxDuration)}</span>
           </div>
           <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
-                remaining <= 10 ? 'bg-red-500' : 'bg-blue-500'
+                remaining <= 10 ? 'bg-red-500' : elapsedSeconds >= 30 ? 'bg-amber-500' : 'bg-blue-500'
               }`}
               style={{ width: `${progress}%` }}
             />
@@ -47,7 +49,12 @@ export default function AudioRecorder({ state, elapsedSeconds, maxDuration = 120
       )}
 
       {state === 'idle' && (
-        <p className="text-sm text-gray-500">Tap to record (max 2 min)</p>
+        <div className="flex flex-col items-center gap-1">
+          <p className="text-sm text-gray-400">
+            <strong>Best under 30 seconds</strong> · Max 2 minutes
+          </p>
+          <p className="text-xs text-gray-500">For longer text, record multiple clips</p>
+        </div>
       )}
     </div>
   );

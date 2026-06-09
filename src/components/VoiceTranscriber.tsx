@@ -82,6 +82,7 @@ function ModelDownloadProgress({ progress, files }: { progress: number; files: F
 
 function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: TranscriptionResult | null }) {
   const [expanded, setExpanded] = useState(false);
+  const [showTechnical, setShowTechnical] = useState(false);
 
   return (
     <div className="w-full text-xs text-gray-500">
@@ -89,10 +90,7 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-center gap-1.5 py-1 hover:text-gray-400 transition-colors"
       >
-        <span>
-          {mode === 'browser' ? 'Audio stays on your device' : 'Audio sent to OpenAI API'}
-          {' \u00B7 English only'}
-        </span>
+        <span>Tips & info</span>
         <svg
           className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -102,42 +100,63 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
       </button>
 
       {expanded && (
-        <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-400 space-y-3">
+        <div className="mt-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-400 space-y-4">
           <div>
-            <p className="font-medium text-gray-300 mb-1">How it works</p>
-            <ol className="list-decimal list-inside space-y-0.5">
-              <li>Tap <strong>Get ready</strong> to load the speech engine (one-time)</li>
-              <li>Tap the mic to start recording</li>
-              <li>Speak naturally, then tap stop</li>
-              <li>Your text appears — tap to edit, then copy</li>
+            <p className="font-medium text-gray-300 mb-1.5">How it works</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li><strong>Tap Get Ready</strong> — allow microphone access when prompted</li>
+              <li><strong>Speak clearly</strong> — the app records audio locally on your device</li>
+              <li><strong>Tap Stop</strong> — transcription begins automatically</li>
+              <li><strong>Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
+              <li><strong>Edit if needed</strong> — tap the text to make corrections</li>
+              <li><strong>Copy</strong> — tap the copy icon to grab your text</li>
             </ol>
           </div>
 
           <div>
-            <p className="font-medium text-gray-300 mb-1">Limits</p>
-            <ul className="space-y-0.5">
-              <li>Best results under <strong>2-3 minutes</strong> per recording</li>
-              <li>Longer recordings take proportionally longer to process</li>
-              <li>English speech only (browser mode)</li>
+            <p className="font-medium text-gray-300 mb-1.5">Best results</p>
+            <ul className="space-y-1">
+              <li><strong>Keep recordings under 30 seconds</strong> for best accuracy</li>
+              <li>Maximum recording length is 2 minutes (auto-stops)</li>
+              <li>For longer content, record in multiple short clips rather than one long take</li>
+              <li>Speak at a natural pace — no need to slow down</li>
+              <li>Minimize background noise</li>
+              <li>One speaker at a time</li>
             </ul>
           </div>
 
           <div>
-            <p className="font-medium text-gray-300 mb-1">Privacy</p>
-            <p>
-              {mode === 'browser'
-                ? 'Audio is processed entirely on your device using Whisper (whisper-tiny.en). Nothing is uploaded — your voice data never leaves this browser.'
-                : 'Audio is sent to OpenAI\'s Whisper API for processing. It is not stored or used for training.'}
-            </p>
+            <p className="font-medium text-gray-300 mb-1.5">About the model</p>
+            <ul className="space-y-1">
+              <li>Uses <strong>Whisper Tiny English</strong> — a small speech recognition model that runs entirely in your browser</li>
+              <li>Audio never leaves your device</li>
+              <li>~40 MB model downloads once, then cached for future visits</li>
+              <li>Best for: short dictation, quick notes, voice memos</li>
+              <li>Not ideal for: long meetings, multiple speakers, noisy environments</li>
+            </ul>
           </div>
 
-          <div>
-            <p className="font-medium text-gray-300 mb-1">Technical</p>
-            <ul className="space-y-0.5">
-              <li>Model: whisper-tiny.en (fp32, ~150 MB download)</li>
-              <li>Processing: WebAssembly, runs on your CPU</li>
-              <li>Model is cached in your browser after first download</li>
-            </ul>
+          <div className="border-t border-gray-700/50 pt-3">
+            <button
+              onClick={() => setShowTechnical(!showTechnical)}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+            >
+              <span>Technical details</span>
+              <svg
+                className={`w-3 h-3 transition-transform ${showTechnical ? 'rotate-180' : ''}`}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {showTechnical && (
+              <ul className="mt-2 space-y-1">
+                <li>Model: <code className="text-gray-300">onnx-community/whisper-tiny.en</code> (fp32, WASM)</li>
+                <li>Audio: 16 kHz mono, processed in 28-second chunks</li>
+                <li>Works in Chrome, Firefox, Edge. Safari has limited support.</li>
+                <li>In-app browsers (Telegram, WhatsApp) may not work — use your default browser</li>
+              </ul>
+            )}
           </div>
 
           {lastResult && (

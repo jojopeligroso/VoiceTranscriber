@@ -2,13 +2,75 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useWhisperBrowser } from '@/hooks/useWhisperBrowser';
+import { useWhisperBrowser, type FileProgress } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
 import AudioRecorder from './AudioRecorder';
 import TranscriptDisplay from './TranscriptDisplay';
 import ModeToggle from './ModeToggle';
 
 type Mode = 'browser' | 'api';
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function ModelDownloadProgress({ progress, files }: { progress: number; files: FileProgress[] }) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  return (
+    <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-200">Preparing speech engine</p>
+          <span className="text-sm tabular-nums text-gray-400">{progress}%</span>
+        </div>
+        <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            One-time download. Cached for future use.
+          </p>
+          {files.length > 0 && (
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+            >
+              {files.length} files
+              <svg
+                className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-180' : ''}`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {showDetails && files.length > 0 && (
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-gray-700/50">
+            {files.map((f) => (
+              <div key={f.name} className="flex items-center gap-2 text-xs">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${f.done ? 'bg-green-500' : 'bg-blue-500 animate-pulse'}`} />
+                <span className="text-gray-400 truncate flex-1">{f.name}</span>
+                <span className="text-gray-500 tabular-nums shrink-0">
+                  {formatBytes(f.loaded)} / {formatBytes(f.total)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export interface VoiceTranscriberProps {
   defaultMode?: Mode;
@@ -109,23 +171,10 @@ export default function VoiceTranscriber({
 
       {/* Model download progress */}
       {mode === 'browser' && whisperBrowser.state === 'loading-model' && (
-        <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-200">Preparing speech engine</p>
-              <span className="text-sm tabular-nums text-gray-400">{whisperBrowser.modelProgress}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${whisperBrowser.modelProgress}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500">
-              One-time download (~40 MB). Cached for future use.
-            </p>
-          </div>
-        </div>
+        <ModelDownloadProgress
+          progress={whisperBrowser.modelProgress}
+          files={whisperBrowser.fileProgresses}
+        />
       )}
 
       {showRecorder && (

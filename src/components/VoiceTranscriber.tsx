@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useWhisperBrowser } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
@@ -38,44 +38,30 @@ export default function VoiceTranscriber({
     whisperAPI.state === 'transcribing';
 
   const hasResult = activeWhisper.state === 'done' && !!activeWhisper.text;
-
-  // Model is ready when it's been loaded (idle after first load, or done/error states)
   const modelReady = whisperBrowser.modelReady;
 
-  // In browser mode, show recorder only after model is ready
-  // In API mode, show recorder immediately
+  // Show recorder when: model ready (browser) or API mode, AND idle or recording
   const showRecorder =
     (mode === 'api' || modelReady) &&
     (recorder.state === 'idle' || recorder.state === 'recording');
 
-  // Gate auto-transcribe to current recording cycle only
-  const recordingIdRef = useRef(0);
-  const lastBlobIdRef = useRef(0);
-
+  // Auto-transcribe when recording stops.
+  // Safe from race conditions because handleStart calls recorder.reset()
+  // (clearing audioBlob + setting state to idle) before resetting whisper.
   useEffect(() => {
-    if (
-      recorder.state === 'stopped' &&
-      recorder.audioBlob &&
-      activeWhisper.state === 'idle' &&
-      lastBlobIdRef.current === recordingIdRef.current
-    ) {
+    if (recorder.state === 'stopped' && recorder.audioBlob && activeWhisper.state === 'idle') {
       activeWhisper.transcribe(recorder.audioBlob);
     }
   }, [recorder.state, recorder.audioBlob, activeWhisper]);
-
-  useEffect(() => {
-    if (recorder.audioBlob) {
-      lastBlobIdRef.current = recordingIdRef.current;
-    }
-  }, [recorder.audioBlob]);
 
   const handleGetReady = () => {
     whisperBrowser.loadModel();
   };
 
   const handleStart = () => {
-    recordingIdRef.current++;
     setDismissedError(null);
+    // Reset recorder FIRST — clears audioBlob and sets state to idle,
+    // preventing the useEffect from re-triggering on stale data
     recorder.reset();
     whisperBrowser.reset();
     whisperAPI.reset();
@@ -83,7 +69,6 @@ export default function VoiceTranscriber({
   };
 
   const handleNewRecording = () => {
-    recordingIdRef.current++;
     setDismissedError(null);
     recorder.reset();
     whisperBrowser.reset();
@@ -183,7 +168,7 @@ export default function VoiceTranscriber({
         </div>
       )}
 
-      {/* Transcribing spinner — only when model is loaded and actively processing audio */}
+      {/* Transcribing spinner */}
       {activeWhisper.state === 'transcribing' && (
         <div className="w-full rounded-lg border border-gray-700 bg-gray-800/50 p-5">
           <div className="flex items-center gap-3">

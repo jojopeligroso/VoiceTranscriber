@@ -271,12 +271,9 @@ export default function VoiceTranscriber({
   const showError = currentError && currentError !== dismissedError;
 
   return (
-    <div className={`flex flex-col items-center gap-4 w-full max-w-md mx-auto px-4 py-6 sm:px-6 ${className ?? ''}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between w-full">
-        <h1 className="text-xl font-semibold text-[var(--fg)]">VoiceTranscriber</h1>
-        <ThemeToggle />
-      </div>
+    <div className={`relative flex flex-col items-center gap-4 w-full max-w-md mx-auto px-4 py-2 sm:px-6 ${className ?? ''}`}>
+      <ThemeToggle />
+      <h1 className="text-xl font-semibold text-[var(--fg)] text-center w-full">VoiceTranscriber</h1>
 
       {/* In-app browser warning */}
       {inApp && !inAppWarningDismissed && (
@@ -320,13 +317,15 @@ export default function VoiceTranscriber({
       )}
 
       {showRecorder && (
-        <AudioRecorder
-          state={recorder.state}
-          elapsedSeconds={recorder.elapsedSeconds}
-          maxDuration={maxDuration}
-          onStart={handleStart}
-          onStop={recorder.stop}
-        />
+        <div className="my-4">
+          <AudioRecorder
+            state={recorder.state}
+            elapsedSeconds={recorder.elapsedSeconds}
+            maxDuration={maxDuration}
+            onStart={handleStart}
+            onStop={recorder.stop}
+          />
+        </div>
       )}
 
       {showError && (

@@ -13,10 +13,10 @@ const themeScript = `
 (function() {
   var t = localStorage.getItem('theme');
   var d = document.documentElement;
-  if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    d.classList.add('dark');
-  } else {
+  if (t === 'light') {
     d.classList.remove('dark');
+  } else {
+    d.classList.add('dark');
   }
 })();
 `;

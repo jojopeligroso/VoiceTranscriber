@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 
-type Theme = 'system' | 'light' | 'dark';
-
 function SunIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -21,78 +19,37 @@ function MoonIcon({ className }: { className?: string }) {
   );
 }
 
-function MonitorIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
-    </svg>
-  );
-}
-
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('system');
+  const [dark, setDark] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored === 'light' || stored === 'dark') {
-      setTheme(stored);
-    }
+    const stored = localStorage.getItem('theme');
+    setDark(stored !== 'light');
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
     const root = document.documentElement;
-
-    if (theme === 'dark') {
+    if (dark) {
       root.classList.add('dark');
-    } else if (theme === 'light') {
+    } else {
       root.classList.remove('dark');
-    } else {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      if (mq.matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-      const handler = (e: MediaQueryListEvent) => {
-        if (e.matches) root.classList.add('dark');
-        else root.classList.remove('dark');
-      };
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
     }
-  }, [theme, mounted]);
-
-  const cycle = () => {
-    const next: Theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
-    setTheme(next);
-    if (next === 'system') {
-      localStorage.removeItem('theme');
-    } else {
-      localStorage.setItem('theme', next);
-    }
-  };
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark, mounted]);
 
   if (!mounted) return <div className="w-8 h-8" />;
 
   return (
     <button
-      onClick={cycle}
-      className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] transition-colors"
-      title={`Theme: ${theme}`}
-      aria-label={`Current theme: ${theme}. Click to change.`}
+      onClick={() => setDark(!dark)}
+      className="absolute top-0 right-0 p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--accent)] transition-colors"
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      {theme === 'light' ? (
-        <SunIcon className="w-5 h-5" />
-      ) : theme === 'dark' ? (
-        <MoonIcon className="w-5 h-5" />
-      ) : (
-        <MonitorIcon className="w-5 h-5" />
-      )}
+      {dark ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
     </button>
   );
 }

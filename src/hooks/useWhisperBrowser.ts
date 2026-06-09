@@ -33,8 +33,10 @@ export function useWhisperBrowser() {
 
     pipelinePromise = pipeline(
       'automatic-speech-recognition',
-      'onnx-community/whisper-tiny.en',
+      'Xenova/whisper-tiny.en',
       {
+        dtype: 'fp32',
+        device: 'wasm',
         progress_callback: (progress: { status: string; progress?: number }) => {
           if (progress.status === 'progress' && typeof progress.progress === 'number') {
             setModelProgress(Math.round(progress.progress));
@@ -74,6 +76,9 @@ export function useWhisperBrowser() {
       setState('done');
       return transcriptionResult;
     } catch (err) {
+      // Reset module cache so retry can re-attempt model load
+      cachedPipeline = null;
+      pipelinePromise = null;
       const msg = err instanceof Error ? err.message : 'Transcription failed';
       setError(msg);
       setState('error');

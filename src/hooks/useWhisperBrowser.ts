@@ -131,7 +131,10 @@ export function useWhisperBrowser() {
       const float32 = await audioToFloat32(blob);
 
       const start = performance.now();
-      const result = await pipe(float32);
+      const result = await pipe(float32, {
+        chunk_length_s: 30,
+        stride_length_s: 5,
+      });
       const durationMs = performance.now() - start;
 
       const transcriptionResult: TranscriptionResult = {

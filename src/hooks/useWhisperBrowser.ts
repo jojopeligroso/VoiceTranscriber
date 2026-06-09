@@ -39,8 +39,6 @@ export function useWhisperBrowser() {
       'automatic-speech-recognition',
       'Xenova/whisper-tiny.en',
       {
-        dtype: 'fp32',
-        device: 'wasm',
         progress_callback: (progress: { status: string; progress?: number }) => {
           if (progress.status === 'progress' && typeof progress.progress === 'number') {
             setModelProgress(Math.round(progress.progress));

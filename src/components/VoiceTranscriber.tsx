@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, type FileProgress } from '@/hooks/useWhisperBrowser';
+import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY, type FileProgress, type WhisperModel } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
 import type { TranscriptionResult } from '@/lib/transcribe';
 import AudioRecorder from './AudioRecorder';
@@ -145,7 +145,7 @@ function ModelSettings({ modelId, onChange, disabled }: { modelId: string; onCha
   );
 }
 
-function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: TranscriptionResult | null }) {
+function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult: TranscriptionResult | null; currentModel?: WhisperModel }) {
   const [expanded, setExpanded] = useState(false);
   const [showTechnical, setShowTechnical] = useState(false);
 
@@ -194,9 +194,9 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
           <div>
             <p className="font-medium text-[var(--accent)] mb-1.5">About the model</p>
             <ul className="space-y-1">
-              <li>Uses <strong className="text-[var(--fg)]">Whisper Tiny English</strong> — a small speech recognition model that runs entirely in your browser</li>
+              <li>Uses <strong className="text-[var(--fg)]">Whisper {currentModel?.label ?? 'Tiny'} {currentModel?.lang ?? 'English'}</strong> — a speech recognition model that runs entirely in your browser</li>
               <li>Audio never leaves your device</li>
-              <li>~40 MB model downloads once, then cached for future visits</li>
+              <li>{currentModel?.size ?? '~40 MB'} model downloads once, then cached for future visits</li>
               <li>Best for: short dictation, quick notes, voice memos</li>
               <li>Not ideal for: long meetings, multiple speakers, noisy environments</li>
             </ul>
@@ -217,7 +217,7 @@ function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: Transcription
             </button>
             {showTechnical && (
               <ul className="mt-2 space-y-1">
-                <li>Model: <code className="text-[var(--accent)]">onnx-community/whisper-tiny.en</code> (fp32, WASM)</li>
+                <li>Model: <code className="text-[var(--accent)]">{currentModel?.id ?? 'onnx-community/whisper-tiny.en'}</code> (fp32, WASM)</li>
                 <li>Audio: 16 kHz mono, processed in 28-second chunks</li>
                 <li>Works in Chrome, Firefox, Edge. Safari has limited support.</li>
                 <li>In-app browsers (Telegram, WhatsApp) may not work — use your default browser</li>
@@ -260,12 +260,12 @@ export default function VoiceTranscriber({
   const inApp = isInAppBrowser();
   const [browserModelId, setBrowserModelId] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
-    return localStorage.getItem('voicetranscriber-model') || DEFAULT_MODEL_ID;
+    return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
   });
 
   const handleModelChange = (id: string) => {
     setBrowserModelId(id);
-    localStorage.setItem('voicetranscriber-model', id);
+    localStorage.setItem(MODEL_STORAGE_KEY, id);
   };
 
   const recorder = useAudioRecorder(maxDuration);
@@ -460,20 +460,19 @@ export default function VoiceTranscriber({
         </button>
       )}
 
-      <div className="w-full">
-        <div className="flex items-center justify-center gap-1">
-          <InfoPanel
-            mode={mode}
-            lastResult={whisperBrowser.lastResult}
+      <div className="flex items-center justify-center gap-1">
+        <InfoPanel
+          mode={mode}
+          lastResult={whisperBrowser.lastResult}
+          currentModel={WHISPER_MODELS.find(m => m.id === browserModelId)}
+        />
+        {mode === 'browser' && (
+          <ModelSettings
+            modelId={browserModelId}
+            onChange={handleModelChange}
+            disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
           />
-          {mode === 'browser' && (
-            <ModelSettings
-              modelId={browserModelId}
-              onChange={handleModelChange}
-              disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
-            />
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

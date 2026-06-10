@@ -56,6 +56,12 @@ export default function TranscriptDisplay({
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const editedTextRef = useRef(editedText);
+  const textRef = useRef(text);
+  const onTextChangeRef = useRef(onTextChange);
+  editedTextRef.current = editedText;
+  textRef.current = text;
+  onTextChangeRef.current = onTextChange;
 
   useEffect(() => {
     if (!text) {
@@ -80,13 +86,14 @@ export default function TranscriptDisplay({
     if (!isEditing) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        if (onTextChange && editedText !== text) onTextChange(editedText);
+        if (onTextChangeRef.current && editedTextRef.current !== textRef.current)
+          onTextChangeRef.current(editedTextRef.current);
         setIsEditing(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isEditing, editedText, text, onTextChange]);
+  }, [isEditing]);
 
   const handleCopy = async () => {
     const textToCopy = isEditing ? editedText : text;

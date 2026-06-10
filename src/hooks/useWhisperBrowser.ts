@@ -31,6 +31,7 @@ export const WHISPER_MODELS: WhisperModel[] = [
 ];
 
 export const DEFAULT_MODEL_ID = 'onnx-community/whisper-tiny.en';
+export const MODEL_STORAGE_KEY = 'voicetranscriber-model';
 
 // Module-level cache so the pipeline persists across component remounts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,8 +51,10 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
   // Reset readiness when model selection changes
   useEffect(() => {
     const ready = !!cachedPipeline && cachedModelId === modelId;
-    setModelReady(ready);
-    if (!ready) setState('idle');
+    if (!ready) {
+      setModelReady(false);
+      setState('idle');
+    }
   }, [modelId]);
 
   // Track per-file progress for aggregation
@@ -147,6 +150,7 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       await loadPipeline();
     } catch (err) {
       cachedPipeline = null;
+      cachedModelId = null;
       pipelinePromise = null;
       const msg = err instanceof Error ? err.message : 'Failed to download model';
       setError(msg);
@@ -204,6 +208,7 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       return transcriptionResult;
     } catch (err) {
       cachedPipeline = null;
+      cachedModelId = null;
       pipelinePromise = null;
       const msg = err instanceof Error ? err.message : 'Transcription failed';
       setError(msg);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { audioToFloat32 } from '@/lib/transcribe';
 import type { TranscriptionResult } from '@/lib/transcribe';
 
@@ -14,24 +14,57 @@ export interface FileProgress {
   done: boolean;
 }
 
+export interface WhisperModel {
+  id: string;
+  label: string;
+  lang: string;
+  size: string;
+}
+
+export const WHISPER_MODELS: WhisperModel[] = [
+  { id: 'onnx-community/whisper-tiny.en', label: 'Tiny', lang: 'English', size: '~40 MB' },
+  { id: 'onnx-community/whisper-tiny', label: 'Tiny', lang: 'Multilingual', size: '~40 MB' },
+  { id: 'onnx-community/whisper-base.en', label: 'Base', lang: 'English', size: '~75 MB' },
+  { id: 'onnx-community/whisper-base', label: 'Base', lang: 'Multilingual', size: '~75 MB' },
+  { id: 'onnx-community/whisper-small.en', label: 'Small', lang: 'English', size: '~250 MB' },
+  { id: 'onnx-community/whisper-small', label: 'Small', lang: 'Multilingual', size: '~250 MB' },
+];
+
+export const DEFAULT_MODEL_ID = 'onnx-community/whisper-tiny.en';
+
 // Module-level cache so the pipeline persists across component remounts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedPipeline: any = null;
+let cachedModelId: string | null = null;
 let pipelinePromise: Promise<unknown> | null = null;
 
-export function useWhisperBrowser() {
+export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
   const [state, setState] = useState<WhisperState>('idle');
   const [text, setText] = useState('');
   const [lastResult, setLastResult] = useState<TranscriptionResult | null>(null);
   const [modelProgress, setModelProgress] = useState(0);
   const [fileProgresses, setFileProgresses] = useState<FileProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [modelReady, setModelReady] = useState(!!cachedPipeline);
+  const [modelReady, setModelReady] = useState(!!cachedPipeline && cachedModelId === modelId);
+
+  // Reset readiness when model selection changes
+  useEffect(() => {
+    const ready = !!cachedPipeline && cachedModelId === modelId;
+    setModelReady(ready);
+    if (!ready) setState('idle');
+  }, [modelId]);
 
   // Track per-file progress for aggregation
   const filesRef = useRef<Map<string, { loaded: number; total: number }>>(new Map());
 
   const loadPipeline = useCallback(async () => {
+    // Invalidate cache if model changed
+    if (cachedPipeline && cachedModelId !== modelId) {
+      cachedPipeline = null;
+      cachedModelId = null;
+      pipelinePromise = null;
+    }
+
     if (cachedPipeline) {
       setModelReady(true);
       return cachedPipeline;
@@ -52,7 +85,7 @@ export function useWhisperBrowser() {
 
     pipelinePromise = pipeline(
       'automatic-speech-recognition',
-      'onnx-community/whisper-tiny.en',
+      modelId,
       {
         dtype: 'fp32',
         device: 'wasm',
@@ -101,12 +134,13 @@ export function useWhisperBrowser() {
     );
 
     cachedPipeline = await pipelinePromise;
+    cachedModelId = modelId;
     pipelinePromise = null;
     setModelProgress(100);
     setModelReady(true);
     setState('idle');
     return cachedPipeline;
-  }, []);
+  }, [modelId]);
 
   const loadModel = useCallback(async () => {
     try {

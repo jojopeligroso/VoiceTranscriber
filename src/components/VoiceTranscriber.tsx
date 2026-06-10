@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useWhisperBrowser, type FileProgress } from '@/hooks/useWhisperBrowser';
+import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, type FileProgress } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
 import type { TranscriptionResult } from '@/lib/transcribe';
 import AudioRecorder from './AudioRecorder';
@@ -80,15 +80,80 @@ function ModelDownloadProgress({ progress, files }: { progress: number; files: F
   );
 }
 
+function ModelSettings({ modelId, onChange, disabled }: { modelId: string; onChange: (id: string) => void; disabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const current = WHISPER_MODELS.find(m => m.id === modelId);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={panelRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`p-1.5 rounded-md transition-colors ${open ? 'text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'}`}
+        title="Model settings"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full right-0 mb-2 w-72 rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-3 shadow-lg z-20">
+          <p className="text-xs font-medium text-[var(--fg)] mb-2">Speech model</p>
+          {current && (
+            <p className="text-xs text-[var(--muted)] mb-3">
+              Current: {current.label} ({current.lang}) — {current.size}
+            </p>
+          )}
+          <div className="flex flex-col gap-1">
+            {WHISPER_MODELS.map(m => (
+              <button
+                key={m.id}
+                disabled={disabled && m.id !== modelId}
+                onClick={() => { onChange(m.id); setOpen(false); }}
+                className={`flex items-center justify-between px-2.5 py-2 rounded-md text-left text-xs transition-colors ${
+                  m.id === modelId
+                    ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
+                    : disabled
+                      ? 'text-[var(--muted)]/50 cursor-not-allowed'
+                      : 'text-[var(--muted)] hover:bg-[var(--surface-alt)] hover:text-[var(--fg)]'
+                }`}
+              >
+                <span className="font-medium">{m.label} <span className="font-normal">— {m.lang}</span></span>
+                <span className="tabular-nums">{m.size}</span>
+              </button>
+            ))}
+          </div>
+          {disabled && (
+            <p className="text-xs text-[var(--muted)] mt-2 italic">
+              Stop recording to change model
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InfoPanel({ mode, lastResult }: { mode: Mode; lastResult: TranscriptionResult | null }) {
   const [expanded, setExpanded] = useState(false);
   const [showTechnical, setShowTechnical] = useState(false);
 
   return (
-    <div className="w-full text-xs text-[var(--muted)]">
+    <div className="text-xs text-[var(--muted)]">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-center gap-1.5 py-1 hover:text-[var(--fg)] transition-colors"
+        className="flex items-center justify-center gap-1.5 py-1 hover:text-[var(--fg)] transition-colors"
       >
         <span>Tips & info</span>
         <svg
@@ -193,9 +258,18 @@ export default function VoiceTranscriber({
   const [accumulatedText, setAccumulatedText] = useState('');
   const prevWhisperTextRef = useRef('');
   const inApp = isInAppBrowser();
+  const [browserModelId, setBrowserModelId] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
+    return localStorage.getItem('voicetranscriber-model') || DEFAULT_MODEL_ID;
+  });
+
+  const handleModelChange = (id: string) => {
+    setBrowserModelId(id);
+    localStorage.setItem('voicetranscriber-model', id);
+  };
 
   const recorder = useAudioRecorder(maxDuration);
-  const whisperBrowser = useWhisperBrowser();
+  const whisperBrowser = useWhisperBrowser(browserModelId);
   const whisperAPI = useWhisperAPI(apiEndpoint);
 
   const activeWhisper = mode === 'browser' ? whisperBrowser : whisperAPI;
@@ -386,10 +460,21 @@ export default function VoiceTranscriber({
         </button>
       )}
 
-      <InfoPanel
-        mode={mode}
-        lastResult={whisperBrowser.lastResult}
-      />
+      <div className="w-full">
+        <div className="flex items-center justify-center gap-1">
+          <InfoPanel
+            mode={mode}
+            lastResult={whisperBrowser.lastResult}
+          />
+          {mode === 'browser' && (
+            <ModelSettings
+              modelId={browserModelId}
+              onChange={handleModelChange}
+              disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

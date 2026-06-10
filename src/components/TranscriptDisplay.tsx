@@ -86,7 +86,7 @@ export default function TranscriptDisplay({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isEditing]);
+  }, [isEditing, editedText, text, onTextChange]);
 
   const handleCopy = async () => {
     const textToCopy = isEditing ? editedText : text;

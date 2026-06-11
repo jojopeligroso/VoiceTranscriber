@@ -9,6 +9,7 @@ import AudioRecorder from './AudioRecorder';
 import TranscriptDisplay from './TranscriptDisplay';
 import ModeToggle from './ModeToggle';
 import ThemeToggle from './ThemeToggle';
+import InstallBanner from './InstallBanner';
 
 type Mode = 'browser' | 'api';
 
@@ -258,6 +259,7 @@ export default function VoiceTranscriber({
   const [accumulatedText, setAccumulatedText] = useState('');
   const prevWhisperTextRef = useRef('');
   const inApp = isInAppBrowser();
+  const [hasTranscribed, setHasTranscribed] = useState(false);
   const [browserModelId, setBrowserModelId] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
     return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
@@ -292,6 +294,7 @@ export default function VoiceTranscriber({
     if (newText && newText !== prevWhisperTextRef.current) {
       setAccumulatedText(prev => prev ? prev + '\n' + newText : newText);
       prevWhisperTextRef.current = newText;
+      setHasTranscribed(true);
     }
     if (!newText) {
       prevWhisperTextRef.current = '';
@@ -474,6 +477,8 @@ export default function VoiceTranscriber({
           />
         )}
       </div>
+
+      <InstallBanner show={hasTranscribed} />
     </div>
   );
 }

@@ -41,7 +41,12 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#0a1628" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');` }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (!iOS && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+          })();
+        ` }} />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

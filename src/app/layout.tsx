@@ -9,14 +9,6 @@ export const metadata: Metadata = {
     apple: "/icon-192.png",
   },
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "VoiceTranscriber",
-  },
-  other: {
-    "mobile-web-app-capable": "yes",
-  },
 };
 
 const themeScript = `
@@ -43,8 +35,15 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
+            if (!('serviceWorker' in navigator)) return;
             var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            if (!iOS && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+            if (iOS) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(r) { r.unregister(); });
+              });
+            } else {
+              navigator.serviceWorker.register('/sw.js');
+            }
           })();
         ` }} />
       </head>

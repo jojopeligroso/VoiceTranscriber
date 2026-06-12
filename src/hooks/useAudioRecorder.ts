@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'stopped';
 
@@ -29,20 +29,23 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const cleanup = useCallback(() => {
+  const stopTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    recorderRef.current = null;
+  }, []);
+
+  const releaseStream = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    recorderRef.current = null;
   }, []);
 
   const start = useCallback(async () => {
-    cleanup();
+    stopTimer();
     setState('idle');
     setError(null);
     setAudioBlob(null);
@@ -50,8 +53,12 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
     chunksRef.current = [];
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      // Reuse existing stream if still active, avoids re-prompting for mic permission
+      let stream = streamRef.current;
+      if (!stream || stream.getTracks().every((t) => t.readyState === 'ended')) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+      }
 
       const mimeType = getSupportedMimeType();
       const recorder = mimeType
@@ -70,7 +77,7 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
         });
         setAudioBlob(blob);
         setState('stopped');
-        cleanup();
+        stopTimer();
       };
 
       recorder.start(1000); // collect chunks every second
@@ -85,7 +92,8 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
         }
       }, 1000);
     } catch (err) {
-      cleanup();
+      stopTimer();
+      releaseStream();
       setState('idle');
       if (err instanceof DOMException && err.name === 'NotAllowedError') {
         setError('Microphone permission denied. Please allow mic access and try again.');
@@ -93,7 +101,7 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
         setError('Could not access microphone.');
       }
     }
-  }, [cleanup]);
+  }, [stopTimer, releaseStream]);
 
   const stop = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state === 'recording') {
@@ -102,13 +110,20 @@ export function useAudioRecorder(maxDuration = DEFAULT_MAX_DURATION) {
   }, []);
 
   const reset = useCallback(() => {
-    cleanup();
+    stopTimer();
     setState('idle');
     setAudioBlob(null);
     setElapsedSeconds(0);
     setError(null);
     chunksRef.current = [];
-  }, [cleanup]);
+  }, [stopTimer]);
+
+  // Release the mic stream when the component unmounts
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   return { start, stop, reset, audioBlob, state, elapsedSeconds, error };
 }

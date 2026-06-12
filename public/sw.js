@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vt-v2';
+const CACHE_NAME = 'vt-v1';
 
 // App shell files to precache on install
 const APP_SHELL = [

@@ -73,10 +73,18 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       return cachedPipeline;
     }
 
+    // If a previous load is in progress, await it — but handle failure
     if (pipelinePromise) {
-      await pipelinePromise;
-      setModelReady(true);
-      return cachedPipeline;
+      try {
+        await pipelinePromise;
+        if (cachedPipeline) {
+          setModelReady(true);
+          return cachedPipeline;
+        }
+      } catch {
+        // Previous load failed — fall through to retry
+        pipelinePromise = null;
+      }
     }
 
     setState('loading-model');
@@ -231,6 +239,10 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     setError(null);
     setModelProgress(0);
     setFileProgresses([]);
+    // Clear dangling promise from failed loads so retry works
+    if (!cachedPipeline) {
+      pipelinePromise = null;
+    }
   }, []);
 
   return { transcribe, loadModel, text, lastResult, state, modelProgress, fileProgresses, modelReady, error, reset };

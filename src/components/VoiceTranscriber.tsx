@@ -79,6 +79,8 @@ export default function VoiceTranscriber({
   }, [activeWhisper.text]);
 
   const handleGetReady = () => {
+    setDismissedError(null);
+    whisperBrowser.reset();
     whisperBrowser.loadModel();
   };
 
@@ -145,7 +147,7 @@ export default function VoiceTranscriber({
       <ModeToggle mode={mode} onChange={setMode} apiAvailable={apiAvailable} />
 
       {/* Get Ready: shown before model is loaded in browser mode */}
-      {mode === 'browser' && !modelReady && whisperBrowser.state === 'idle' && (
+      {mode === 'browser' && !modelReady && (whisperBrowser.state === 'idle' || whisperBrowser.state === 'error') && (
         <button
           onClick={handleGetReady}
           className="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--accent)] text-[#05182e] font-medium hover:opacity-90 transition-opacity"

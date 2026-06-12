@@ -24,7 +24,8 @@ export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    // Hydration: read client-side state after mount
+    setMounted(true); // eslint-disable-line react-hooks/set-state-in-effect
     const stored = localStorage.getItem('theme');
     setDark(stored !== 'light');
   }, []);

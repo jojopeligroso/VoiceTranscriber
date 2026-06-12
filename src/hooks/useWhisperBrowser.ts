@@ -33,11 +33,126 @@ export const WHISPER_MODELS: WhisperModel[] = [
 export const DEFAULT_MODEL_ID = 'onnx-community/whisper-tiny.en';
 export const MODEL_STORAGE_KEY = 'voicetranscriber-model';
 
-// Module-level cache so the pipeline persists across component remounts
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let cachedPipeline: any = null;
-let cachedModelId: string | null = null;
-let pipelinePromise: Promise<unknown> | null = null;
+// ---------------------------------------------------------------------------
+// Module-level worker singleton and resolver references
+// ---------------------------------------------------------------------------
+
+let workerInstance: Worker | null = null;
+let workerModelId: string | null = null;
+
+let resolveLoad: (() => void) | null = null;
+let rejectLoad: ((err: Error) => void) | null = null;
+let resolveTranscribe: ((result: TranscriptionResult) => void) | null = null;
+let rejectTranscribe: ((err: Error) => void) | null = null;
+let progressCallback: ((event: {
+  status: string;
+  file?: string;
+  name?: string;
+  loaded?: number;
+  total?: number;
+  progress?: number;
+}) => void) | null = null;
+let chunkCallback: ((text: string, index: number, total: number) => void) | null = null;
+
+function getOrCreateWorker(): Worker {
+  if (!workerInstance) {
+    workerInstance = new Worker('/whisper-worker.js', { type: 'module' });
+    workerInstance.onmessage = handleWorkerMessage;
+  }
+  return workerInstance;
+}
+
+function terminateWorker() {
+  if (workerInstance) {
+    workerInstance.terminate();
+    workerInstance = null;
+  }
+  workerModelId = null;
+  resolveLoad = null;
+  rejectLoad = null;
+  resolveTranscribe = null;
+  rejectTranscribe = null;
+  progressCallback = null;
+  chunkCallback = null;
+}
+
+function handleWorkerMessage(event: MessageEvent) {
+  const msg = event.data as {
+    type: string;
+    data?: {
+      status: string;
+      file?: string;
+      name?: string;
+      loaded?: number;
+      total?: number;
+      progress?: number;
+    };
+    text?: string;
+    chunkIndex?: number;
+    totalChunks?: number;
+    durationMs?: number;
+    audioDurationS?: number;
+    chunks?: number;
+    message?: string;
+  };
+
+  switch (msg.type) {
+    case 'model-progress':
+      if (progressCallback && msg.data) {
+        progressCallback(msg.data);
+      }
+      break;
+
+    case 'model-ready':
+      // workerModelId is set inside resolveLoad (which captures modelId via closure)
+      if (resolveLoad) {
+        resolveLoad();
+        resolveLoad = null;
+        rejectLoad = null;
+      }
+      break;
+
+    case 'chunk-result':
+      if (chunkCallback && typeof msg.text === 'string' && typeof msg.chunkIndex === 'number' && typeof msg.totalChunks === 'number') {
+        chunkCallback(msg.text, msg.chunkIndex, msg.totalChunks);
+      }
+      break;
+
+    case 'transcribe-done':
+      if (resolveTranscribe) {
+        const result: TranscriptionResult = {
+          text: msg.text ?? '',
+          mode: 'browser',
+          durationMs: msg.durationMs ?? 0,
+          audioDurationS: msg.audioDurationS,
+          chunks: msg.chunks,
+        };
+        resolveTranscribe(result);
+        resolveTranscribe = null;
+        rejectTranscribe = null;
+        chunkCallback = null;
+      }
+      break;
+
+    case 'error': {
+      const err = new Error(msg.message ?? 'Worker error');
+      if (rejectLoad) {
+        rejectLoad(err);
+        resolveLoad = null;
+        rejectLoad = null;
+      } else if (rejectTranscribe) {
+        rejectTranscribe(err);
+        resolveTranscribe = null;
+        rejectTranscribe = null;
+      }
+      break;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
 export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
   const [state, setState] = useState<WhisperState>('idle');
@@ -46,37 +161,25 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
   const [modelProgress, setModelProgress] = useState(0);
   const [fileProgresses, setFileProgresses] = useState<FileProgress[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [modelReady, setModelReady] = useState(!!cachedPipeline && cachedModelId === modelId);
+  const [modelReady, setModelReady] = useState(workerModelId === modelId);
+
+  // Track per-file progress for aggregation (same logic as before)
+  const filesRef = useRef<Map<string, { loaded: number; total: number }>>(new Map());
 
   // Reset readiness when model selection changes
   useEffect(() => {
-    const ready = !!cachedPipeline && cachedModelId === modelId;
+    const ready = workerModelId === modelId;
     if (!ready) {
-      setModelReady(false);
+      setModelReady(false); // eslint-disable-line react-hooks/set-state-in-effect
       setState('idle');
     }
   }, [modelId]);
 
-  // Track per-file progress for aggregation
-  const filesRef = useRef<Map<string, { loaded: number; total: number }>>(new Map());
-
-  const loadPipeline = useCallback(async () => {
-    // Invalidate cache if model changed
-    if (cachedPipeline && cachedModelId !== modelId) {
-      cachedPipeline = null;
-      cachedModelId = null;
-      pipelinePromise = null;
-    }
-
-    if (cachedPipeline) {
+  const loadModel = useCallback(async () => {
+    // If this model is already loaded in the worker, nothing to do
+    if (workerModelId === modelId) {
       setModelReady(true);
-      return cachedPipeline;
-    }
-
-    if (pipelinePromise) {
-      await pipelinePromise;
-      setModelReady(true);
-      return cachedPipeline;
+      return;
     }
 
     setState('loading-model');
@@ -84,138 +187,103 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     setFileProgresses([]);
     filesRef.current.clear();
 
-    const { pipeline } = await import('@huggingface/transformers');
+    // Wire up the progress callback before posting so no events are missed
+    progressCallback = (event) => {
+      const fileKey = event.file || event.name || 'unknown';
 
-    pipelinePromise = pipeline(
-      'automatic-speech-recognition',
-      modelId,
-      {
-        dtype: 'fp32',
-        device: 'wasm',
-        progress_callback: (event: {
-          status: string;
-          file?: string;
-          name?: string;
-          loaded?: number;
-          total?: number;
-          progress?: number;
-        }) => {
-          const fileKey = event.file || event.name || 'unknown';
+      if (event.status === 'progress' && typeof event.loaded === 'number' && typeof event.total === 'number') {
+        filesRef.current.set(fileKey, { loaded: event.loaded, total: event.total });
 
-          if (event.status === 'progress' && typeof event.loaded === 'number' && typeof event.total === 'number') {
-            filesRef.current.set(fileKey, { loaded: event.loaded, total: event.total });
+        let totalLoaded = 0;
+        let totalSize = 0;
+        const details: FileProgress[] = [];
 
-            // Aggregate: total loaded / total size across all files
-            let totalLoaded = 0;
-            let totalSize = 0;
-            const details: FileProgress[] = [];
+        filesRef.current.forEach((val, key) => {
+          totalLoaded += val.loaded;
+          totalSize += val.total;
+          const pct = val.total > 0 ? Math.round((val.loaded / val.total) * 100) : 0;
+          details.push({
+            name: key.split('/').pop() || key,
+            loaded: val.loaded,
+            total: val.total,
+            progress: pct,
+            done: pct >= 100,
+          });
+        });
 
-            filesRef.current.forEach((val, key) => {
-              totalLoaded += val.loaded;
-              totalSize += val.total;
-              const pct = val.total > 0 ? Math.round((val.loaded / val.total) * 100) : 0;
-              details.push({
-                name: key.split('/').pop() || key,
-                loaded: val.loaded,
-                total: val.total,
-                progress: pct,
-                done: pct >= 100,
-              });
-            });
+        const aggregate = totalSize > 0 ? Math.round((totalLoaded / totalSize) * 100) : 0;
+        setModelProgress(aggregate);
+        setFileProgresses(details);
+      } else if (event.status === 'done') {
+        const existing = filesRef.current.get(fileKey);
+        if (existing) {
+          filesRef.current.set(fileKey, { loaded: existing.total, total: existing.total });
+        }
+      }
+    };
 
-            const aggregate = totalSize > 0 ? Math.round((totalLoaded / totalSize) * 100) : 0;
-            setModelProgress(aggregate);
-            setFileProgresses(details);
-          } else if (event.status === 'done') {
-            const existing = filesRef.current.get(fileKey);
-            if (existing) {
-              filesRef.current.set(fileKey, { loaded: existing.total, total: existing.total });
-            }
-          }
-        },
-      },
-    );
-
-    cachedPipeline = await pipelinePromise;
-    cachedModelId = modelId;
-    pipelinePromise = null;
-    setModelProgress(100);
-    setModelReady(true);
-    setState('idle');
-    return cachedPipeline;
-  }, [modelId]);
-
-  const loadModel = useCallback(async () => {
     try {
-      await loadPipeline();
+      await new Promise<void>((resolve, reject) => {
+        resolveLoad = () => {
+          workerModelId = modelId;
+          setModelProgress(100);
+          setModelReady(true);
+          setState('idle');
+          resolve();
+        };
+        rejectLoad = reject;
+
+        const worker = getOrCreateWorker();
+        worker.postMessage({ type: 'load-model', modelId });
+      });
     } catch (err) {
-      cachedPipeline = null;
-      cachedModelId = null;
-      pipelinePromise = null;
+      terminateWorker();
       const msg = err instanceof Error ? err.message : 'Failed to download model';
       setError(msg);
       setState('error');
+    } finally {
+      progressCallback = null;
     }
-  }, [loadPipeline]);
+  }, [modelId]);
 
   const transcribe = useCallback(async (blob: Blob): Promise<TranscriptionResult | null> => {
     setError(null);
     setText('');
 
     try {
-      const pipe = await loadPipeline();
-      if (!pipe) throw new Error('Failed to load Whisper model');
+      // Ensure the model is loaded (no-ops if already loaded in the worker)
+      await loadModel();
 
-      setState('transcribing');
+      // Decode and resample audio on the main thread (requires AudioContext/DOM APIs)
       const float32 = await audioToFloat32(blob);
 
-      const start = performance.now();
+      setState('transcribing');
 
-      // Manual chunking: split audio into ~28s segments and transcribe each.
-      // Whisper has a 30-second context window; the pipeline's built-in
-      // chunking doesn't work reliably with WASM + fp32.
-      const SAMPLE_RATE = 16000;
-      const CHUNK_SECONDS = 28;
-      const CHUNK_SAMPLES = CHUNK_SECONDS * SAMPLE_RATE;
+      const result = await new Promise<TranscriptionResult>((resolve, reject) => {
+        resolveTranscribe = resolve;
+        rejectTranscribe = reject;
 
-      const chunks: string[] = [];
-      for (let offset = 0; offset < float32.length; offset += CHUNK_SAMPLES) {
-        const end = Math.min(offset + CHUNK_SAMPLES, float32.length);
-        const segment = float32.slice(offset, end);
-        // Skip very short trailing segments (< 0.5s)
-        if (segment.length < SAMPLE_RATE * 0.5) break;
-        const segResult = await pipe(segment);
-        const segText = (segResult.text || '').trim();
-        if (segText) chunks.push(segText);
-      }
+        chunkCallback = null;
 
-      const fullText = chunks.join(' ');
-      const durationMs = performance.now() - start;
+        const worker = getOrCreateWorker();
+        worker.postMessage(
+          { type: 'transcribe', audio: float32 },
+          [float32.buffer],
+        );
+      });
 
-      const audioDurationS = Math.round(float32.length / SAMPLE_RATE);
-
-      const transcriptionResult: TranscriptionResult = {
-        text: fullText,
-        mode: 'browser',
-        durationMs,
-        audioDurationS,
-        chunks: chunks.length,
-      };
-
-      setText(transcriptionResult.text);
-      setLastResult(transcriptionResult);
+      setText(result.text);
+      setLastResult(result);
       setState('done');
-      return transcriptionResult;
+      return result;
     } catch (err) {
-      cachedPipeline = null;
-      cachedModelId = null;
-      pipelinePromise = null;
+      terminateWorker();
       const msg = err instanceof Error ? err.message : 'Transcription failed';
       setError(msg);
       setState('error');
       return null;
     }
-  }, [loadPipeline]);
+  }, [loadModel]);
 
   const reset = useCallback(() => {
     setState('idle');
@@ -223,6 +291,7 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     setError(null);
     setModelProgress(0);
     setFileProgresses([]);
+    // Worker is NOT terminated — it still holds the cached model
   }, []);
 
   return { transcribe, loadModel, text, lastResult, state, modelProgress, fileProgresses, modelReady, error, reset };

@@ -18,7 +18,7 @@ export default function InstallBanner({ show }: { show: boolean }) {
     // Check if already dismissed or already installed as PWA
     const wasDismissed = localStorage.getItem(DISMISSED_KEY) === 'true';
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    setDismissed(wasDismissed || isStandalone);
+    setDismissed(wasDismissed || isStandalone); // eslint-disable-line react-hooks/set-state-in-effect
 
     const handler = (e: Event) => {
       e.preventDefault();

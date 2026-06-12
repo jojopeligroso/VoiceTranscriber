@@ -2,242 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY, type FileProgress, type WhisperModel } from '@/hooks/useWhisperBrowser';
+import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
-import type { TranscriptionResult } from '@/lib/transcribe';
 import AudioRecorder from './AudioRecorder';
 import TranscriptDisplay from './TranscriptDisplay';
 import ModeToggle from './ModeToggle';
 import ThemeToggle from './ThemeToggle';
 import InstallBanner from './InstallBanner';
+import { isInAppBrowser } from '@/lib/utils';
+import ModelDownloadProgress from './ModelDownloadProgress';
+import ModelSettings from './ModelSettings';
+import InfoPanel from './InfoPanel';
 
 type Mode = 'browser' | 'api';
-
-function isInAppBrowser(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function ModelDownloadProgress({ progress, files }: { progress: number; files: FileProgress[] }) {
-  const [showDetails, setShowDetails] = useState(false);
-
-  return (
-    <div className="w-full rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-5">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-[var(--fg)]">Preparing speech engine</p>
-          <span className="text-sm tabular-nums text-[var(--muted)]">{progress}%</span>
-        </div>
-        <div className="w-full h-2 bg-[var(--surface-alt)] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[var(--teal)] rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-[var(--muted)]">
-            One-time download. Cached for future use.
-          </p>
-          {files.length > 0 && (
-            <button
-              onClick={() => setShowDetails(!showDetails)}
-              className="text-xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors flex items-center gap-1"
-            >
-              {files.length} files
-              <svg
-                className={`w-3 h-3 transition-transform ${showDetails ? 'rotate-180' : ''}`}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-          )}
-        </div>
-        {showDetails && files.length > 0 && (
-          <div className="flex flex-col gap-1.5 pt-1 border-t border-[var(--surface-alt)]">
-            {files.map((f) => (
-              <div key={f.name} className="flex items-center gap-2 text-xs">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${f.done ? 'bg-[var(--teal)]' : 'bg-[var(--accent)] animate-pulse'}`} />
-                <span className="text-[var(--muted)] truncate flex-1">{f.name}</span>
-                <span className="text-[var(--muted)] tabular-nums shrink-0">
-                  {formatBytes(f.loaded)} / {formatBytes(f.total)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ModelSettings({ modelId, onChange, disabled }: { modelId: string; onChange: (id: string) => void; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const current = WHISPER_MODELS.find(m => m.id === modelId);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={panelRef}>
-      <button
-        onClick={() => setOpen(!open)}
-        className={`p-1.5 rounded-md transition-colors ${open ? 'text-[var(--accent)]' : 'text-[var(--muted)] hover:text-[var(--fg)]'}`}
-        title="Model settings"
-      >
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full right-0 mb-2 w-72 rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-3 shadow-lg z-20">
-          <p className="text-xs font-medium text-[var(--fg)] mb-2">Speech model</p>
-          {current && (
-            <p className="text-xs text-[var(--muted)] mb-3">
-              Current: {current.label} ({current.lang}) — {current.size}
-            </p>
-          )}
-          <div className="flex flex-col gap-1">
-            {WHISPER_MODELS.map(m => (
-              <button
-                key={m.id}
-                disabled={disabled && m.id !== modelId}
-                onClick={() => { onChange(m.id); setOpen(false); }}
-                className={`flex items-center justify-between px-2.5 py-2 rounded-md text-left text-xs transition-colors ${
-                  m.id === modelId
-                    ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
-                    : disabled
-                      ? 'text-[var(--muted)]/50 cursor-not-allowed'
-                      : 'text-[var(--muted)] hover:bg-[var(--surface-alt)] hover:text-[var(--fg)]'
-                }`}
-              >
-                <span className="font-medium">{m.label} <span className="font-normal">— {m.lang}</span></span>
-                <span className="tabular-nums">{m.size}</span>
-              </button>
-            ))}
-          </div>
-          {disabled && (
-            <p className="text-xs text-[var(--muted)] mt-2 italic">
-              Stop recording to change model
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult: TranscriptionResult | null; currentModel?: WhisperModel }) {
-  const [expanded, setExpanded] = useState(false);
-  const [showTechnical, setShowTechnical] = useState(false);
-
-  return (
-    <div className="text-xs text-[var(--muted)]">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-center gap-1.5 py-1 hover:text-[var(--fg)] transition-colors"
-      >
-        <span>Tips & info</span>
-        <svg
-          className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-
-      {expanded && (
-        <div className="mt-2 rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-4 text-sm text-[var(--muted)] space-y-4">
-          <div>
-            <p className="font-medium text-[var(--accent)] mb-1.5">How it works</p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li><strong className="text-[var(--fg)]">Tap Get Ready</strong> — allow microphone access when prompted</li>
-              <li><strong className="text-[var(--fg)]">Speak clearly</strong> — the app records audio locally on your device</li>
-              <li><strong className="text-[var(--fg)]">Tap Stop</strong> — transcription begins automatically</li>
-              <li><strong className="text-[var(--fg)]">Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
-              <li><strong className="text-[var(--fg)]">Record more</strong> — each clip's text is added to your document. Record as many clips as you need.</li>
-              <li><strong className="text-[var(--fg)]">Edit if needed</strong> — tap the text to make corrections</li>
-              <li><strong className="text-[var(--fg)]">Copy</strong> — tap the copy icon to grab your text</li>
-            </ol>
-          </div>
-
-          <div>
-            <p className="font-medium text-[var(--accent)] mb-1.5">Best results</p>
-            <ul className="space-y-1">
-              <li><strong className="text-[var(--fg)]">Keep recordings under 30 seconds</strong> for best accuracy</li>
-              <li>Maximum recording length is 2 minutes (auto-stops)</li>
-              <li>For longer content, record multiple short clips — each one appends to your text automatically</li>
-              <li>Speak at a natural pace — no need to slow down</li>
-              <li>Minimize background noise</li>
-              <li>One speaker at a time</li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="font-medium text-[var(--accent)] mb-1.5">About the model</p>
-            <ul className="space-y-1">
-              <li>Uses <strong className="text-[var(--fg)]">Whisper {currentModel?.label ?? 'Tiny'} {currentModel?.lang ?? 'English'}</strong> — a speech recognition model that runs entirely in your browser</li>
-              <li>Audio never leaves your device</li>
-              <li>{currentModel?.size ?? '~40 MB'} model downloads once, then cached for future visits</li>
-              <li>Best for: short dictation, quick notes, voice memos</li>
-              <li>Not ideal for: long meetings, multiple speakers, noisy environments</li>
-            </ul>
-          </div>
-
-          <div className="border-t border-[var(--surface-alt)] pt-3">
-            <button
-              onClick={() => setShowTechnical(!showTechnical)}
-              className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
-            >
-              <span>Technical details</span>
-              <svg
-                className={`w-3 h-3 transition-transform ${showTechnical ? 'rotate-180' : ''}`}
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-            {showTechnical && (
-              <ul className="mt-2 space-y-1">
-                <li>Model: <code className="text-[var(--accent)]">{currentModel?.id ?? 'onnx-community/whisper-tiny.en'}</code> (fp32, WASM)</li>
-                <li>Audio: 16 kHz mono, processed in 28-second chunks</li>
-                <li>Works in Chrome, Firefox, Edge. Safari has limited support.</li>
-                <li>In-app browsers (Telegram, WhatsApp) may not work — use your default browser</li>
-              </ul>
-            )}
-          </div>
-
-          {lastResult && (
-            <div className="pt-2 border-t border-[var(--surface-alt)] text-[var(--muted)] tabular-nums">
-              Last: {lastResult.audioDurationS}s audio
-              {' \u00B7 '}{lastResult.chunks} chunk{lastResult.chunks !== 1 ? 's' : ''}
-              {' \u00B7 '}{(lastResult.durationMs / 1000).toFixed(1)}s processing
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export interface VoiceTranscriberProps {
   defaultMode?: Mode;
@@ -320,14 +97,14 @@ export default function VoiceTranscriber({
     whisperAPI.reset();
   };
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setDismissedError(null);
     setAccumulatedText('');
     prevWhisperTextRef.current = '';
     recorder.reset();
     whisperBrowser.reset();
     whisperAPI.reset();
-  };
+  }, [recorder, whisperBrowser, whisperAPI]);
 
   const handleRetry = useCallback(() => {
     if (recorder.audioBlob) {
@@ -352,7 +129,7 @@ export default function VoiceTranscriber({
         <div className="w-full rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm text-[var(--accent)]">
-              You're in an in-app browser. The speech model (~150 MB) will need to re-download each visit.
+              You&apos;re in an in-app browser. The speech model (~150 MB) will need to re-download each visit.
               For the best experience, open this page in your default browser.
             </p>
             <button

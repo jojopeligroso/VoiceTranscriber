@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
+import { PenIcon, CopyIcon, CheckIcon, TrashIcon } from './icons';
 
 interface TranscriptDisplayProps {
   text: string;
@@ -9,43 +10,7 @@ interface TranscriptDisplayProps {
   onTextChange?: (text: string) => void;
 }
 
-function PenIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-      <path d="m15 5 4 4" />
-    </svg>
-  );
-}
-
-function CopyIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18" />
-      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-    </svg>
-  );
-}
-
-export default function TranscriptDisplay({
+function TranscriptDisplay({
   text,
   whisperState,
   onClear,
@@ -59,27 +24,34 @@ export default function TranscriptDisplay({
   const editedTextRef = useRef(editedText);
   const textRef = useRef(text);
   const onTextChangeRef = useRef(onTextChange);
-  editedTextRef.current = editedText;
-  textRef.current = text;
-  onTextChangeRef.current = onTextChange;
 
+  // Keep refs current for the click-outside handler (must be in effect, not render)
+  useEffect(() => {
+    editedTextRef.current = editedText;
+    textRef.current = text;
+    onTextChangeRef.current = onTextChange;
+  });
+
+  // Sync editedText from prop only when NOT editing — prevents cursor resets
   useEffect(() => {
     if (!text) {
-      setIsEditing(false);
+      setIsEditing(false); // eslint-disable-line react-hooks/set-state-in-effect
       setEditedText('');
     } else if (!isEditing) {
       setEditedText(text);
     }
-  }, [text, isEditing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
 
+  // Focus + cursor-to-end only on the false→true transition into editing
+  const wasEditingRef = useRef(false);
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
+    if (isEditing && !wasEditingRef.current && textareaRef.current) {
       textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(
-        textareaRef.current.value.length,
-        textareaRef.current.value.length,
-      );
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
     }
+    wasEditingRef.current = isEditing;
   }, [isEditing]);
 
   useEffect(() => {
@@ -185,6 +157,8 @@ export default function TranscriptDisplay({
             ref={textareaRef}
             value={editedText}
             onChange={(e) => setEditedText(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             className="w-full min-h-[240px] sm:min-h-[320px] bg-transparent text-[var(--fg)] text-base p-4 pr-16 resize-y focus:outline-none"
           />
         ) : hasText ? (
@@ -200,3 +174,5 @@ export default function TranscriptDisplay({
     </div>
   );
 }
+
+export default memo(TranscriptDisplay);

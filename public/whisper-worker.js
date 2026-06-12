@@ -106,16 +106,20 @@ async function transcribe(audio) {
   }
 }
 
-self.addEventListener('message', async (event) => {
+self.addEventListener('message', (event) => {
   const msg = event.data;
 
   switch (msg.type) {
     case 'load-model':
-      await loadModel(msg.modelId);
+      loadModel(msg.modelId).catch((err) => {
+        self.postMessage({ type: 'error', message: err.message || 'Load failed' });
+      });
       break;
 
     case 'transcribe':
-      await transcribe(msg.audio);
+      transcribe(msg.audio).catch((err) => {
+        self.postMessage({ type: 'error', message: err.message || 'Transcribe failed' });
+      });
       break;
 
     default:

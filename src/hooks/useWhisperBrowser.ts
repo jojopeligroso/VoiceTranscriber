@@ -58,6 +58,18 @@ function getOrCreateWorker(): Worker {
   if (!workerInstance) {
     workerInstance = new Worker('/whisper-worker.js', { type: 'module' });
     workerInstance.onmessage = handleWorkerMessage;
+    workerInstance.onerror = (e) => {
+      const err = new Error(e.message || 'Worker failed to initialize');
+      if (rejectLoad) {
+        rejectLoad(err);
+        resolveLoad = null;
+        rejectLoad = null;
+      } else if (rejectTranscribe) {
+        rejectTranscribe(err);
+        resolveTranscribe = null;
+        rejectTranscribe = null;
+      }
+    };
   }
   return workerInstance;
 }
@@ -180,6 +192,11 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     if (workerModelId === modelId) {
       setModelReady(true);
       return;
+    }
+
+    // If a different model is loading, kill the worker to avoid WASM OOM (std::bad_alloc)
+    if (resolveLoad) {
+      terminateWorker();
     }
 
     setState('loading-model');

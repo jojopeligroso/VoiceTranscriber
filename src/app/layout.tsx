@@ -41,11 +41,15 @@ export default function RootLayout({
               navigator.serviceWorker.getRegistrations().then(function(regs) {
                 regs.forEach(function(r) { r.unregister(); });
               });
-              // Clear any stale caches from previous deploys
-              if ('caches' in window) {
+              // One-time stale cache cleanup (removes old SW caches, preserves model cache)
+              var cacheFixed = localStorage.getItem('vt-cache-v2');
+              if (!cacheFixed && 'caches' in window) {
                 caches.keys().then(function(keys) {
-                  keys.forEach(function(k) { caches.delete(k); });
+                  keys.forEach(function(k) {
+                    if (k.startsWith('vt-')) caches.delete(k);
+                  });
                 });
+                localStorage.setItem('vt-cache-v2', '1');
               }
             } else {
               navigator.serviceWorker.register('/sw.js');

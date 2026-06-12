@@ -34,7 +34,7 @@ export default function InfoPanel({ lastResult, currentModel }: { mode: Mode; la
               <li><strong className="text-[var(--fg)]">Speak clearly</strong> — the app records audio locally on your device</li>
               <li><strong className="text-[var(--fg)]">Tap Stop</strong> — transcription begins automatically</li>
               <li><strong className="text-[var(--fg)]">Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
-              <li><strong className="text-[var(--fg)]">Record more</strong> — each clip&apos;s text is added to your document. Record as many clips as you need.</li>
+              <li><strong className="text-[var(--fg)]">Record more</strong> — each clip&apos;s text is added to your document. No character limit — record as many clips as you need.</li>
               <li><strong className="text-[var(--fg)]">Edit if needed</strong> — tap the text to make corrections</li>
               <li><strong className="text-[var(--fg)]">Copy</strong> — tap the copy icon to grab your text</li>
             </ol>
@@ -56,7 +56,7 @@ export default function InfoPanel({ lastResult, currentModel }: { mode: Mode; la
             <p className="font-medium text-[var(--accent)] mb-1.5">About the model</p>
             <ul className="space-y-1">
               <li>Uses <strong className="text-[var(--fg)]">Whisper {currentModel?.label ?? 'Tiny'} {currentModel?.lang ?? 'English'}</strong> — a speech recognition model that runs entirely in your browser</li>
-              <li>Audio never leaves your device</li>
+              <li>Audio never leaves your device — all processing happens locally, even offline after the model is cached</li>
               <li>{currentModel?.size ?? '~40 MB'} model downloads once, then cached for future visits</li>
               <li>Best for: short dictation, quick notes, voice memos</li>
               <li>Not ideal for: long meetings, multiple speakers, noisy environments</li>

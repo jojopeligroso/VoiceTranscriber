@@ -159,15 +159,26 @@ function TranscriptDisplay({
             onChange={(e) => setEditedText(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            className="w-full min-h-[240px] sm:min-h-[320px] bg-transparent text-[var(--fg)] text-base p-4 pr-16 resize-y focus:outline-none"
+            className="transcript-scroll w-full min-h-[240px] sm:min-h-[320px] max-h-[60vh] bg-transparent text-[var(--fg)] text-base p-4 pr-16 resize-y focus:outline-none"
           />
         ) : hasText ? (
-          <p className="text-[var(--fg)] text-base whitespace-pre-wrap p-4 pr-16">{displayText}</p>
+          <div className="transcript-scroll max-h-[60vh] overflow-y-auto">
+            <p className="text-[var(--fg)] text-base whitespace-pre-wrap p-4 pr-16">{displayText}</p>
+          </div>
         ) : (
           <div className="flex items-center justify-center min-h-[240px] sm:min-h-[320px]">
             <p className="text-sm text-[var(--muted)] italic">
               Your transcription will appear here
             </p>
+          </div>
+        )}
+
+        {/* Character count */}
+        {hasText && (
+          <div className="px-4 pb-2 text-right">
+            <span className="text-xs tabular-nums text-[var(--muted)]">
+              {displayText.length.toLocaleString()} chars
+            </span>
           </div>
         )}
       </div>

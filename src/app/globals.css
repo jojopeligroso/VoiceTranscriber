@@ -36,3 +36,22 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Themed scrollbars for transcript area */
+.transcript-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-alt) transparent;
+}
+.transcript-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.transcript-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.transcript-scroll::-webkit-scrollbar-thumb {
+  background: var(--surface-alt);
+  border-radius: 3px;
+}
+.transcript-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}

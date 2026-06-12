@@ -88,7 +88,10 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
 
     // Enable ONNX WASM proxy: runs inference in an internal worker thread,
     // preventing the main thread from freezing during transcription.
-    if (env.backends?.onnx?.wasm) {
+    // Skip on iOS/Safari where the proxy worker can fail to initialize.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!isIOS && env.backends?.onnx?.wasm) {
       env.backends.onnx.wasm.proxy = true;
     }
 

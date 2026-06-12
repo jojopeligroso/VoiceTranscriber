@@ -73,18 +73,10 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       return cachedPipeline;
     }
 
-    // If a previous load is in progress, await it — but handle failure
     if (pipelinePromise) {
-      try {
-        await pipelinePromise;
-        if (cachedPipeline) {
-          setModelReady(true);
-          return cachedPipeline;
-        }
-      } catch {
-        // Previous load failed — fall through to retry
-        pipelinePromise = null;
-      }
+      await pipelinePromise;
+      setModelReady(true);
+      return cachedPipeline;
     }
 
     setState('loading-model');
@@ -92,16 +84,7 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     setFileProgresses([]);
     filesRef.current.clear();
 
-    const { pipeline, env } = await import('@huggingface/transformers');
-
-    // Enable ONNX WASM proxy: runs inference in an internal worker thread,
-    // preventing the main thread from freezing during transcription.
-    // Skip on iOS/Safari where the proxy worker can fail to initialize.
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (!isIOS && env.backends?.onnx?.wasm) {
-      env.backends.onnx.wasm.proxy = true;
-    }
+    const { pipeline } = await import('@huggingface/transformers');
 
     pipelinePromise = pipeline(
       'automatic-speech-recognition',
@@ -187,9 +170,6 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
 
       const start = performance.now();
 
-      // Manual chunking: split audio into ~28s segments and transcribe each.
-      // Whisper has a 30-second context window; the pipeline's built-in
-      // chunking doesn't work reliably with WASM + fp32.
       const SAMPLE_RATE = 16000;
       const CHUNK_SECONDS = 28;
       const CHUNK_SAMPLES = CHUNK_SECONDS * SAMPLE_RATE;
@@ -198,7 +178,6 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       for (let offset = 0; offset < float32.length; offset += CHUNK_SAMPLES) {
         const end = Math.min(offset + CHUNK_SAMPLES, float32.length);
         const segment = float32.slice(offset, end);
-        // Skip very short trailing segments (< 0.5s)
         if (segment.length < SAMPLE_RATE * 0.5) break;
         const segResult = await pipe(segment);
         const segText = (segResult.text || '').trim();
@@ -207,7 +186,6 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
 
       const fullText = chunks.join(' ');
       const durationMs = performance.now() - start;
-
       const audioDurationS = Math.round(float32.length / SAMPLE_RATE);
 
       const transcriptionResult: TranscriptionResult = {
@@ -239,10 +217,6 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     setError(null);
     setModelProgress(0);
     setFileProgresses([]);
-    // Clear dangling promise from failed loads so retry works
-    if (!cachedPipeline) {
-      pipelinePromise = null;
-    }
   }, []);
 
   return { transcribe, loadModel, text, lastResult, state, modelProgress, fileProgresses, modelReady, error, reset };

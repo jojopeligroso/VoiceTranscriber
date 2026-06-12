@@ -14,9 +14,7 @@ export async function audioToFloat32(blob: Blob): Promise<Float32Array> {
   const nativeSampleRate = audioBuffer.sampleRate;
 
   if (nativeSampleRate === 16000) {
-    // Copy the data — getChannelData returns a view into the AudioContext's buffer,
-    // which becomes invalid after close() on some engines (iOS WebKit)
-    const data = new Float32Array(audioBuffer.getChannelData(0));
+    const data = audioBuffer.getChannelData(0);
     audioContext.close();
     return data;
   }

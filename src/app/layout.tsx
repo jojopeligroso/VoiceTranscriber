@@ -41,6 +41,12 @@ export default function RootLayout({
               navigator.serviceWorker.getRegistrations().then(function(regs) {
                 regs.forEach(function(r) { r.unregister(); });
               });
+              // Clear any stale caches from previous deploys
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  keys.forEach(function(k) { caches.delete(k); });
+                });
+              }
             } else {
               navigator.serviceWorker.register('/sw.js');
             }

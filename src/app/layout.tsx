@@ -21,6 +21,14 @@ const themeScript = `
 })();
 `;
 
+// Evict any stale service worker left over from the old PWA build so it can't
+// serve cached app-shell assets. Does NOT clear Cache Storage, so the
+// transformers.js model cache is preserved (blanket cache-clearing previously
+// caused the model to re-download on every load).
+const swCleanupScript = `
+if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister(); }); }); }
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,6 +38,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: swCleanupScript }} />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

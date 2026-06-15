@@ -18,6 +18,25 @@ function isInAppBrowser(): boolean {
   return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
 }
 
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // iPhone/iPod, plus iPadOS 13+ which reports as "MacIntel" with touch.
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// iOS Safari caps per-origin Cache Storage at roughly the size of the ~40 MB
+// tiny model. Larger models exceed the quota, fail to cache, and re-download
+// endlessly — so on iOS we only offer the tiny models.
+function isIOSSafeModel(id: string): boolean {
+  return id.includes('whisper-tiny');
+}
+
+function modelsForPlatform(): WhisperModel[] {
+  return isIOS() ? WHISPER_MODELS.filter((m) => isIOSSafeModel(m.id)) : WHISPER_MODELS;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -80,10 +99,10 @@ function ModelDownloadProgress({ progress, files }: { progress: number; files: F
   );
 }
 
-function ModelSettings({ modelId, onChange, disabled }: { modelId: string; onChange: (id: string) => void; disabled: boolean }) {
+function ModelSettings({ modelId, onChange, disabled, models, note }: { modelId: string; onChange: (id: string) => void; disabled: boolean; models: WhisperModel[]; note?: string }) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const current = WHISPER_MODELS.find(m => m.id === modelId);
+  const current = models.find(m => m.id === modelId) ?? WHISPER_MODELS.find(m => m.id === modelId);
 
   useEffect(() => {
     if (!open) return;
@@ -116,7 +135,7 @@ function ModelSettings({ modelId, onChange, disabled }: { modelId: string; onCha
             </p>
           )}
           <div className="flex flex-col gap-1">
-            {WHISPER_MODELS.map(m => (
+            {models.map(m => (
               <button
                 key={m.id}
                 disabled={disabled && m.id !== modelId}
@@ -134,6 +153,11 @@ function ModelSettings({ modelId, onChange, disabled }: { modelId: string; onCha
               </button>
             ))}
           </div>
+          {note && (
+            <p className="text-xs text-[var(--muted)] mt-2 italic">
+              {note}
+            </p>
+          )}
           {disabled && (
             <p className="text-xs text-[var(--muted)] mt-2 italic">
               Stop recording to change model
@@ -258,9 +282,14 @@ export default function VoiceTranscriber({
   const [accumulatedText, setAccumulatedText] = useState('');
   const prevWhisperTextRef = useRef('');
   const inApp = isInAppBrowser();
+  const availableModels = modelsForPlatform();
   const [browserModelId, setBrowserModelId] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
-    return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
+    const stored = localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
+    // On iOS, force any previously-saved large model back to the tiny model,
+    // which is the only size that fits Safari's Cache Storage quota.
+    if (isIOS() && !isIOSSafeModel(stored)) return DEFAULT_MODEL_ID;
+    return stored;
   });
 
   const handleModelChange = (id: string) => {
@@ -471,6 +500,8 @@ export default function VoiceTranscriber({
             modelId={browserModelId}
             onChange={handleModelChange}
             disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
+            models={availableModels}
+            note={isIOS() ? 'Larger models exceed iPhone storage limits, so only the Tiny model is available on iOS.' : undefined}
           />
         )}
       </div>

@@ -487,7 +487,7 @@ export default function VoiceTranscriber({
             onChange={handleModelChange}
             disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
             models={availableModels}
-            note={isIOS() ? 'iPhone & iPad support only the Tiny model — larger models exceed iOS browser limits.' : undefined}
+            note={"iPhone & iPad: use only the Tiny (40 MB) model — larger ones fail to load. If a model won't load on your device, switch to a smaller one."}
           />
         )}
       </div>

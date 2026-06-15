@@ -217,7 +217,7 @@ function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult:
             </button>
             {showTechnical && (
               <ul className="mt-2 space-y-1">
-                <li>Model: <code className="text-[var(--accent)]">{currentModel?.id ?? 'onnx-community/whisper-tiny.en'}</code> (fp32, WASM)</li>
+                <li>Model: <code className="text-[var(--accent)]">{currentModel?.id ?? 'onnx-community/whisper-tiny.en'}</code> (q8, WASM)</li>
                 <li>Audio: 16 kHz mono, processed in 28-second chunks</li>
                 <li>Works in Chrome, Firefox, Edge. Safari has limited support.</li>
                 <li>In-app browsers (Telegram, WhatsApp) may not work — use your default browser</li>

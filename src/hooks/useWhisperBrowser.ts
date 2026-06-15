@@ -33,6 +33,13 @@ export const WHISPER_MODELS: WhisperModel[] = [
 export const DEFAULT_MODEL_ID = 'onnx-community/whisper-tiny.en';
 export const MODEL_STORAGE_KEY = 'voicetranscriber-model';
 
+// Sentinels (sessionStorage) used to detect an iOS memory-kill reload that
+// interrupts the model download. If a load starts but the page reloads before
+// it finishes, the sentinel survives into the fresh page and we can surface a
+// clear message instead of silently re-downloading forever.
+const LOAD_SENTINEL_KEY = 'voicetranscriber-loading';
+const LOAD_FAILS_KEY = 'voicetranscriber-load-fails';
+
 // Module-level cache so the pipeline persists across component remounts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedPipeline: any = null;
@@ -56,6 +63,30 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       setState('idle');
     }
   }, [modelId]);
+
+  // Detect a reload that interrupted a previous model load (iOS memory kill).
+  // Runs once on mount: if the load sentinel is still set but no pipeline is
+  // cached, the page reloaded mid-download. Count it, and after a second such
+  // failure surface guidance instead of letting the download loop forever.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (sessionStorage.getItem(LOAD_SENTINEL_KEY) && !cachedPipeline) {
+        sessionStorage.removeItem(LOAD_SENTINEL_KEY);
+        const fails = Number(sessionStorage.getItem(LOAD_FAILS_KEY) || '0') + 1;
+        sessionStorage.setItem(LOAD_FAILS_KEY, String(fails));
+        if (fails >= 2) {
+          setError(
+            'This device ran out of memory loading the on-device speech model. ' +
+            'Switch to Server mode (toggle at the top) for reliable transcription on iPhone.',
+          );
+          setState('error');
+        }
+      }
+    } catch {
+      /* sessionStorage unavailable (e.g. private mode) — ignore */
+    }
+  }, []);
 
   // Track per-file progress for aggregation
   const filesRef = useRef<Map<string, { loaded: number; total: number }>>(new Map());
@@ -84,13 +115,34 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     setFileProgresses([]);
     filesRef.current.clear();
 
-    const { pipeline } = await import('@huggingface/transformers');
+    // Mark that a load is in progress so a memory-kill reload can be detected.
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.setItem(LOAD_SENTINEL_KEY, '1'); } catch { /* ignore */ }
+    }
+
+    // Ask the browser to keep our cached model from being evicted, so it
+    // downloads once instead of re-fetching every visit (iOS evicts eagerly).
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      try { await navigator.storage.persist(); } catch { /* ignore */ }
+    }
+
+    const { pipeline, env } = await import('@huggingface/transformers');
+
+    // Single-threaded WASM keeps the memory footprint low and deterministic on
+    // iOS Safari, which has a strict per-tab memory ceiling. Multi-threading
+    // duplicates the heap per worker and tends to trip that ceiling.
+    if (env.backends?.onnx?.wasm) {
+      env.backends.onnx.wasm.numThreads = 1;
+    }
 
     pipelinePromise = pipeline(
       'automatic-speech-recognition',
       modelId,
       {
-        dtype: 'fp32',
+        // q8 (8-bit) instead of fp32 cuts peak memory ~4x so the model fits
+        // under iOS Safari's per-tab limit. q8 uses standard quantized matmul
+        // (not the MatMulNBits op that forced fp32 originally — that was q4).
+        dtype: 'q8',
         device: 'wasm',
         progress_callback: (event: {
           status: string;
@@ -139,6 +191,13 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     cachedPipeline = await pipelinePromise;
     cachedModelId = modelId;
     pipelinePromise = null;
+    // Load finished cleanly — clear the reload sentinel and failure counter.
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(LOAD_SENTINEL_KEY);
+        sessionStorage.removeItem(LOAD_FAILS_KEY);
+      } catch { /* ignore */ }
+    }
     setModelProgress(100);
     setModelReady(true);
     setState('idle');
@@ -152,6 +211,9 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       cachedPipeline = null;
       cachedModelId = null;
       pipelinePromise = null;
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.removeItem(LOAD_SENTINEL_KEY); } catch { /* ignore */ }
+      }
       const msg = err instanceof Error ? err.message : 'Failed to download model';
       setError(msg);
       setState('error');
@@ -210,6 +272,9 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       cachedPipeline = null;
       cachedModelId = null;
       pipelinePromise = null;
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.removeItem(LOAD_SENTINEL_KEY); } catch { /* ignore */ }
+      }
       const msg = err instanceof Error ? err.message : 'Transcription failed';
       setError(msg);
       setState('error');

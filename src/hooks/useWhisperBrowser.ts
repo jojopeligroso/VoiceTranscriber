@@ -40,6 +40,28 @@ export const MODEL_STORAGE_KEY = 'voicetranscriber-model';
 const LOAD_SENTINEL_KEY = 'voicetranscriber-loading';
 const LOAD_FAILS_KEY = 'voicetranscriber-load-fails';
 
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // iPhone/iPod, plus iPadOS 13+ which reports as "MacIntel" with touch.
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// Which models can run at all on iOS. Small (~250 MB) exceeds iOS Safari's
+// runtime memory ceiling, so only Tiny and Base are offered on iPhone/iPad.
+export function isIOSCompatibleModel(id: string): boolean {
+  return id.includes('whisper-tiny') || id.includes('whisper-base');
+}
+
+// Which models fit iOS Safari's Cache Storage quota (~the 40 MB Tiny model).
+// Larger iOS-compatible models (Base) must run WITHOUT browser caching: a
+// failed cache write is what caused the endless re-download loop, so we skip
+// caching entirely for them — they re-download each visit but actually run.
+function isIOSCacheableModel(id: string): boolean {
+  return id.includes('whisper-tiny');
+}
+
 // Module-level cache so the pipeline persists across component remounts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let cachedPipeline: any = null;
@@ -77,8 +99,8 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
         sessionStorage.setItem(LOAD_FAILS_KEY, String(fails));
         if (fails >= 2) {
           setError(
-            'This device ran out of memory loading the on-device speech model. ' +
-            'Switch to Server mode (toggle at the top) for reliable transcription on iPhone.',
+            'This device ran out of memory loading the speech model. ' +
+            'Switch to the Tiny model (Model settings) for reliable transcription on iPhone.',
           );
           setState('error');
         }
@@ -134,6 +156,12 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     if (env.backends?.onnx?.wasm) {
       env.backends.onnx.wasm.numThreads = 1;
     }
+
+    // On iOS, skip browser caching for models too big for Safari's Cache
+    // Storage quota (anything larger than Tiny). The failed cache write is what
+    // caused the re-download loop; running un-cached avoids it. Everywhere else
+    // (and for Tiny on iOS) caching stays on so the model persists.
+    env.useBrowserCache = !(isIOS() && !isIOSCacheableModel(modelId));
 
     pipelinePromise = pipeline(
       'automatic-speech-recognition',

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY, type FileProgress, type WhisperModel } from '@/hooks/useWhisperBrowser';
+import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY, isIOS, isIOSCompatibleModel, type FileProgress, type WhisperModel } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
 import type { TranscriptionResult } from '@/lib/transcribe';
 import AudioRecorder from './AudioRecorder';
@@ -18,23 +18,9 @@ function isInAppBrowser(): boolean {
   return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
 }
 
-function isIOS(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  // iPhone/iPod, plus iPadOS 13+ which reports as "MacIntel" with touch.
-  return /iPad|iPhone|iPod/.test(ua) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-// iOS Safari caps per-origin Cache Storage at roughly the size of the ~40 MB
-// tiny model. Larger models exceed the quota, fail to cache, and re-download
-// endlessly — so on iOS we only offer the tiny models.
-function isIOSSafeModel(id: string): boolean {
-  return id.includes('whisper-tiny');
-}
-
+// On iOS only Tiny and Base are offered (Small exceeds Safari's memory ceiling).
 function modelsForPlatform(): WhisperModel[] {
-  return isIOS() ? WHISPER_MODELS.filter((m) => isIOSSafeModel(m.id)) : WHISPER_MODELS;
+  return isIOS() ? WHISPER_MODELS.filter((m) => isIOSCompatibleModel(m.id)) : WHISPER_MODELS;
 }
 
 function formatBytes(bytes: number): string {
@@ -286,9 +272,9 @@ export default function VoiceTranscriber({
   const [browserModelId, setBrowserModelId] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
     const stored = localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
-    // On iOS, force any previously-saved large model back to the tiny model,
-    // which is the only size that fits Safari's Cache Storage quota.
-    if (isIOS() && !isIOSSafeModel(stored)) return DEFAULT_MODEL_ID;
+    // On iOS, force any previously-saved incompatible model (e.g. Small) back
+    // to the tiny default so a returning user isn't stuck in the download loop.
+    if (isIOS() && !isIOSCompatibleModel(stored)) return DEFAULT_MODEL_ID;
     return stored;
   });
 
@@ -501,7 +487,7 @@ export default function VoiceTranscriber({
             onChange={handleModelChange}
             disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
             models={availableModels}
-            note={isIOS() ? 'Larger models exceed iPhone storage limits, so only the Tiny model is available on iOS.' : undefined}
+            note={isIOS() ? 'On iPhone, Tiny is saved for instant reuse. Base works too but re-downloads each visit. Larger models aren’t supported on iOS.' : undefined}
           />
         )}
       </div>

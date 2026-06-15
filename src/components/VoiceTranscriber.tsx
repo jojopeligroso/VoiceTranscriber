@@ -18,7 +18,7 @@ function isInAppBrowser(): boolean {
   return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
 }
 
-// On iOS only Tiny and Base are offered (Small exceeds Safari's memory ceiling).
+// On iOS only the Tiny model is offered — larger models exceed iOS browser limits.
 function modelsForPlatform(): WhisperModel[] {
   return isIOS() ? WHISPER_MODELS.filter((m) => isIOSCompatibleModel(m.id)) : WHISPER_MODELS;
 }
@@ -487,7 +487,7 @@ export default function VoiceTranscriber({
             onChange={handleModelChange}
             disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
             models={availableModels}
-            note={isIOS() ? 'On iPhone, Tiny is saved for instant reuse. Base works too but re-downloads each visit. Larger models aren’t supported on iOS.' : undefined}
+            note={isIOS() ? 'iPhone & iPad support only the Tiny model — larger models exceed iOS browser limits.' : undefined}
           />
         )}
       </div>

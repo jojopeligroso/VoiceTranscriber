@@ -48,17 +48,12 @@ export function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// Which models can run at all on iOS. Small (~250 MB) exceeds iOS Safari's
-// runtime memory ceiling, so only Tiny and Base are offered on iPhone/iPad.
+// Which models can run on iOS. iOS Safari/WebKit imposes a hard per-tab memory
+// ceiling and a small Cache Storage quota: anything beyond the ~40 MB Tiny
+// model refuses to run (Base ~75 MB and Small ~250 MB both fail, cached or
+// not). All iOS browsers use WebKit, so this also covers Chrome/Firefox/Edge
+// on iPhone and iPad.
 export function isIOSCompatibleModel(id: string): boolean {
-  return id.includes('whisper-tiny') || id.includes('whisper-base');
-}
-
-// Which models fit iOS Safari's Cache Storage quota (~the 40 MB Tiny model).
-// Larger iOS-compatible models (Base) must run WITHOUT browser caching: a
-// failed cache write is what caused the endless re-download loop, so we skip
-// caching entirely for them — they re-download each visit but actually run.
-function isIOSCacheableModel(id: string): boolean {
   return id.includes('whisper-tiny');
 }
 
@@ -156,12 +151,6 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
     if (env.backends?.onnx?.wasm) {
       env.backends.onnx.wasm.numThreads = 1;
     }
-
-    // On iOS, skip browser caching for models too big for Safari's Cache
-    // Storage quota (anything larger than Tiny). The failed cache write is what
-    // caused the re-download loop; running un-cached avoids it. Everywhere else
-    // (and for Tiny on iOS) caching stays on so the model persists.
-    env.useBrowserCache = !(isIOS() && !isIOSCacheableModel(modelId));
 
     pipelinePromise = pipeline(
       'automatic-speech-recognition',

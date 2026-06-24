@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY, isIOS, isIOSCompatibleModel, type FileProgress, type WhisperModel } from '@/hooks/useWhisperBrowser';
+import { useWhisperBrowser, WHISPER_MODELS, DEFAULT_MODEL_ID, MODEL_STORAGE_KEY, IOS_ALLOWED_MODEL_ID, isIOS, isModelAllowedOnPlatform, type FileProgress, type WhisperModel } from '@/hooks/useWhisperBrowser';
 import { useWhisperAPI } from '@/hooks/useWhisperAPI';
 import type { TranscriptionResult } from '@/lib/transcribe';
+import { useSnippets } from '@/hooks/useSnippets';
 import AudioRecorder from './AudioRecorder';
 import TranscriptDisplay from './TranscriptDisplay';
 import ModeToggle from './ModeToggle';
 import ThemeToggle from './ThemeToggle';
+import SnippetsPanel, { ActiveBucketBar } from './SnippetsPanel';
 
 type Mode = 'browser' | 'api';
 
@@ -18,9 +20,11 @@ function isInAppBrowser(): boolean {
   return /FBAN|FBAV|Instagram|Telegram|Twitter|Line|WhatsApp|Snapchat|WeChat|MicroMessenger/i.test(ua);
 }
 
-// On iOS only the Tiny model is offered — larger models exceed iOS browser limits.
+// All models are always shown. On iOS the non-allowed ones are rendered greyed
+// out / disabled (see ModelSettings) rather than hidden, so the user can see why
+// only the Tiny model is available.
 function modelsForPlatform(): WhisperModel[] {
-  return isIOS() ? WHISPER_MODELS.filter((m) => isIOSCompatibleModel(m.id)) : WHISPER_MODELS;
+  return WHISPER_MODELS;
 }
 
 function formatBytes(bytes: number): string {
@@ -121,23 +125,27 @@ function ModelSettings({ modelId, onChange, disabled, models, note }: { modelId:
             </p>
           )}
           <div className="flex flex-col gap-1">
-            {models.map(m => (
-              <button
-                key={m.id}
-                disabled={disabled && m.id !== modelId}
-                onClick={() => { onChange(m.id); setOpen(false); }}
-                className={`flex items-center justify-between px-2.5 py-2 rounded-md text-left text-xs transition-colors ${
-                  m.id === modelId
-                    ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
-                    : disabled
-                      ? 'text-[var(--muted)]/50 cursor-not-allowed'
-                      : 'text-[var(--muted)] hover:bg-[var(--surface-alt)] hover:text-[var(--fg)]'
-                }`}
-              >
-                <span className="font-medium">{m.label} <span className="font-normal">— {m.lang}</span></span>
-                <span className="tabular-nums">{m.size}</span>
-              </button>
-            ))}
+            {models.map(m => {
+              const platformBlocked = !isModelAllowedOnPlatform(m.id);
+              const rowDisabled = platformBlocked || (disabled && m.id !== modelId);
+              return (
+                <button
+                  key={m.id}
+                  disabled={rowDisabled}
+                  onClick={() => { onChange(m.id); setOpen(false); }}
+                  className={`flex items-center justify-between px-2.5 py-2 rounded-md text-left text-xs transition-colors ${
+                    m.id === modelId
+                      ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
+                      : rowDisabled
+                        ? 'text-[var(--muted)]/40 cursor-not-allowed'
+                        : 'text-[var(--muted)] hover:bg-[var(--surface-alt)] hover:text-[var(--fg)]'
+                  }`}
+                >
+                  <span className="font-medium">{m.label} <span className="font-normal">— {m.lang}</span></span>
+                  <span className="tabular-nums">{m.size}</span>
+                </button>
+              );
+            })}
           </div>
           {note && (
             <p className="text-xs text-[var(--muted)] mt-2 italic">
@@ -271,14 +279,25 @@ export default function VoiceTranscriber({
   const availableModels = modelsForPlatform();
   const [browserModelId, setBrowserModelId] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
-    const stored = localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
-    // On iOS, force any previously-saved incompatible model (e.g. Small) back
-    // to the tiny default so a returning user isn't stuck in the download loop.
-    if (isIOS() && !isIOSCompatibleModel(stored)) return DEFAULT_MODEL_ID;
-    return stored;
+    // On iOS, always lock to the single allowed Tiny English model — overriding
+    // any previously-saved larger model so a returning user can't get stuck in
+    // the out-of-memory download loop.
+    if (isIOS()) return IOS_ALLOWED_MODEL_ID;
+    return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
   });
 
+  // If iOS had a stale larger model saved, correct the persisted value so it
+  // doesn't linger for non-iOS sessions on the same profile.
+  useEffect(() => {
+    if (isIOS()) {
+      try { localStorage.setItem(MODEL_STORAGE_KEY, IOS_ALLOWED_MODEL_ID); } catch { /* ignore */ }
+    }
+  }, []);
+
   const handleModelChange = (id: string) => {
+    // Defensive: ignore selections that aren't permitted on this platform
+    // (the disabled buttons already prevent this, but guard anyway).
+    if (!isModelAllowedOnPlatform(id)) return;
     setBrowserModelId(id);
     localStorage.setItem(MODEL_STORAGE_KEY, id);
   };
@@ -286,6 +305,7 @@ export default function VoiceTranscriber({
   const recorder = useAudioRecorder(maxDuration);
   const whisperBrowser = useWhisperBrowser(browserModelId);
   const whisperAPI = useWhisperAPI(apiEndpoint);
+  const snippets = useSnippets();
 
   const activeWhisper = mode === 'browser' ? whisperBrowser : whisperAPI;
   const hasResult = activeWhisper.state === 'done' && !!activeWhisper.text;
@@ -302,16 +322,21 @@ export default function VoiceTranscriber({
     }
   }, [recorder.state, recorder.audioBlob, activeWhisper]);
 
+  const addSnippet = snippets.addSnippet;
   useEffect(() => {
     const newText = activeWhisper.text;
     if (newText && newText !== prevWhisperTextRef.current) {
       setAccumulatedText(prev => prev ? prev + '\n' + newText : newText);
       prevWhisperTextRef.current = newText;
+      // Auto-save each finished transcript into the active bucket. The text guard
+      // above keeps this from re-saving when addSnippet's identity changes (e.g.
+      // the active bucket switches) without new transcript text.
+      addSnippet(newText);
     }
     if (!newText) {
       prevWhisperTextRef.current = '';
     }
-  }, [activeWhisper.text]);
+  }, [activeWhisper.text, addSnippet]);
 
   const handleGetReady = () => {
     whisperBrowser.loadModel();
@@ -340,6 +365,10 @@ export default function VoiceTranscriber({
     whisperBrowser.reset();
     whisperAPI.reset();
   };
+
+  const handleInsertSnippet = useCallback((text: string) => {
+    setAccumulatedText(prev => (prev ? prev + '\n' + text : text));
+  }, []);
 
   const handleRetry = useCallback(() => {
     if (recorder.audioBlob) {
@@ -455,6 +484,16 @@ export default function VoiceTranscriber({
         </div>
       )}
 
+      {snippets.ready && snippets.buckets.length > 0 && (
+        <div className="w-full flex justify-end">
+          <ActiveBucketBar
+            buckets={snippets.buckets}
+            activeBucketId={snippets.activeBucketId}
+            onSelect={snippets.setActiveBucket}
+          />
+        </div>
+      )}
+
       <TranscriptDisplay
         text={accumulatedText}
         whisperState={activeWhisper.state}
@@ -487,10 +526,26 @@ export default function VoiceTranscriber({
             onChange={handleModelChange}
             disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
             models={availableModels}
-            note={"iPhone & iPad: use only the Tiny (40 MB) model — larger ones fail to load. If a model won't load on your device, switch to a smaller one."}
+            note={isIOS()
+              ? "Due to the type of device you're using (mobile / iOS), only this Tiny model is available — larger models exceed the memory limits of mobile browsers."
+              : "On iPhone & iPad only the Tiny (~40 MB) model works — larger ones exceed mobile browser memory limits. If a model won't load on your device, switch to a smaller one."}
           />
         )}
       </div>
+
+      {snippets.ready && (
+        <SnippetsPanel
+          buckets={snippets.buckets}
+          snippets={snippets.snippets}
+          activeBucketId={snippets.activeBucketId}
+          onSetActive={snippets.setActiveBucket}
+          onAddBucket={snippets.addBucket}
+          onRemoveBucket={snippets.removeBucket}
+          onRenameBucket={snippets.renameBucket}
+          onDeleteSnippet={snippets.removeSnippet}
+          onInsertSnippet={handleInsertSnippet}
+        />
+      )}
     </div>
   );
 }

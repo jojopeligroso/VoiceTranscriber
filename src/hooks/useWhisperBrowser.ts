@@ -48,13 +48,18 @@ export function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// Which models can run on iOS. iOS Safari/WebKit imposes a hard per-tab memory
-// ceiling and a small Cache Storage quota: anything beyond the ~40 MB Tiny
-// model refuses to run (Base ~75 MB and Small ~250 MB both fail, cached or
-// not). All iOS browsers use WebKit, so this also covers Chrome/Firefox/Edge
-// on iPhone and iPad.
-export function isIOSCompatibleModel(id: string): boolean {
-  return id.includes('whisper-tiny');
+// The single model allowed on iOS. iOS Safari/WebKit imposes a hard per-tab
+// memory ceiling and a small Cache Storage quota: anything beyond the ~40 MB
+// Tiny model refuses to run (Base ~75 MB and Small ~250 MB both fail, cached or
+// not). We lock iOS to the English-only Tiny model — the smallest, most reliable
+// option — rather than also offering the multilingual Tiny. All iOS browsers use
+// WebKit, so this also covers Chrome/Firefox/Edge/Brave on iPhone and iPad.
+export const IOS_ALLOWED_MODEL_ID = DEFAULT_MODEL_ID; // 'onnx-community/whisper-tiny.en'
+
+// Whether a given model may be selected on the current platform. On iOS only the
+// single allowed Tiny English model is permitted; every other platform allows all.
+export function isModelAllowedOnPlatform(id: string): boolean {
+  return !isIOS() || id === IOS_ALLOWED_MODEL_ID;
 }
 
 // Module-level cache so the pipeline persists across component remounts

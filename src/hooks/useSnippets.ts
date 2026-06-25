@@ -8,6 +8,7 @@ import {
   putSnippet,
   deleteSnippet as dbDeleteSnippet,
   setActiveBucketId as dbSetActiveBucketId,
+  getStorageEstimate,
   requestPersistence,
   newId,
   now,
@@ -15,9 +16,10 @@ import {
   MAX_BUCKETS,
   type Bucket,
   type Snippet,
+  type StorageEstimate,
 } from '@/lib/snippetStore';
 
-export type { Bucket, Snippet };
+export type { Bucket, Snippet, StorageEstimate };
 export { MAX_BUCKETS };
 
 const DEFAULT_BUCKET_NAME = 'Bucket 1';
@@ -29,6 +31,7 @@ export interface UseSnippets {
   snippetsByBucket: (bucketId: string) => Snippet[];
   activeBucketId: string | null;
   activeBucket: Bucket | null;
+  storageEstimate: StorageEstimate | null;
   setActiveBucket: (bucketId: string) => void;
   addBucket: (name?: string) => string | null;
   removeBucket: (bucketId: string) => void;
@@ -42,6 +45,7 @@ export function useSnippets(): UseSnippets {
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [activeBucketId, setActiveBucketIdState] = useState<string | null>(null);
+  const [storageEstimate, setStorageEstimate] = useState<StorageEstimate | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -73,6 +77,10 @@ export function useSnippets(): UseSnippets {
       setSnippets(data.snippets);
       setActiveBucketIdState(active);
       setReady(true);
+
+      // Initial storage estimate
+      const est = await getStorageEstimate(data.snippets);
+      if (mounted.current) setStorageEstimate(est);
     })();
     return () => {
       mounted.current = false;
@@ -140,30 +148,48 @@ export function useSnippets(): UseSnippets {
     );
   }, []);
 
+  const refreshStorage = useCallback((snips: Snippet[]) => {
+    void getStorageEstimate(snips).then((est) => {
+      if (mounted.current) setStorageEstimate(est);
+    });
+  }, []);
+
   const addSnippet = useCallback(
     (text: string, bucketId?: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       const target = bucketId ?? activeBucketId;
       if (!target) return;
-      const created = now();
-      const snippet: Snippet = {
-        id: newId(),
-        bucketId: target,
-        text: trimmed,
-        createdAt: created,
-        expiresAt: created + SNIPPET_RETENTION_MS,
-      };
-      void putSnippet(snippet);
-      setSnippets((prev) => [snippet, ...prev]);
+
+      setSnippets((prev) => {
+        // Dedup: skip if identical text already exists in this bucket
+        if (prev.some((s) => s.bucketId === target && s.text === trimmed)) return prev;
+
+        const created = now();
+        const snippet: Snippet = {
+          id: newId(),
+          bucketId: target,
+          text: trimmed,
+          createdAt: created,
+          expiresAt: created + SNIPPET_RETENTION_MS,
+        };
+        void putSnippet(snippet);
+        const next = [snippet, ...prev];
+        refreshStorage(next);
+        return next;
+      });
     },
-    [activeBucketId],
+    [activeBucketId, refreshStorage],
   );
 
   const removeSnippet = useCallback((snippetId: string) => {
     void dbDeleteSnippet(snippetId);
-    setSnippets((prev) => prev.filter((s) => s.id !== snippetId));
-  }, []);
+    setSnippets((prev) => {
+      const next = prev.filter((s) => s.id !== snippetId);
+      refreshStorage(next);
+      return next;
+    });
+  }, [refreshStorage]);
 
   const activeBucket = useMemo(
     () => buckets.find((b) => b.id === activeBucketId) ?? null,
@@ -177,6 +203,7 @@ export function useSnippets(): UseSnippets {
     snippetsByBucket,
     activeBucketId,
     activeBucket,
+    storageEstimate,
     setActiveBucket,
     addBucket,
     removeBucket,

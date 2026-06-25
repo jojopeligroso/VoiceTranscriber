@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MAX_BUCKETS, type Bucket, type Snippet } from '@/hooks/useSnippets';
+import { MAX_BUCKETS, type Bucket, type Snippet, type StorageEstimate } from '@/hooks/useSnippets';
+import { isIOS } from '@/hooks/useWhisperBrowser';
 
 function CopyIcon({ className }: { className?: string }) {
   return (
@@ -37,6 +38,24 @@ function InsertIcon({ className }: { className?: string }) {
       <path d="M5 12h14" />
     </svg>
   );
+}
+
+function ClipboardListIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M12 11h4" /><path d="M12 16h4" />
+      <path d="M8 11h.01" /><path d="M8 16h.01" />
+    </svg>
+  );
+}
+
+function formatStorageBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 function ChevronIcon({ className }: { className?: string }) {
@@ -138,6 +157,7 @@ function BucketSection({
   onRename,
   onRemove,
   onCopySnippet,
+  onCopyAll,
   onInsertSnippet,
   onDeleteSnippet,
 }: {
@@ -149,12 +169,14 @@ function BucketSection({
   onRename: (id: string, name: string) => void;
   onRemove: (id: string) => void;
   onCopySnippet: (text: string) => void;
+  onCopyAll: (snippets: Snippet[]) => void;
   onInsertSnippet?: (text: string) => void;
   onDeleteSnippet: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(bucket.name);
+  const [copiedAll, setCopiedAll] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -204,8 +226,18 @@ function BucketSection({
         )}
 
         <span className="shrink-0 text-[10px] tabular-nums text-[var(--muted)]">
-          {snippets.length}
+          {snippets.length}{snippets.length > 0 ? ` · ${formatStorageBytes(snippets.reduce((acc, s) => acc + s.text.length * 2 + 100, 0))}` : ''}
         </span>
+
+        {snippets.length > 0 && (
+          <button
+            onClick={() => { onCopyAll(snippets); setCopiedAll(true); setTimeout(() => setCopiedAll(false), 1200); }}
+            className="shrink-0 p-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-alt)] transition-colors"
+            title="Copy all snippets"
+          >
+            {copiedAll ? <CheckIcon className="w-4 h-4 text-[var(--teal)]" /> : <ClipboardListIcon className="w-4 h-4" />}
+          </button>
+        )}
 
         {isActive ? (
           <span className="shrink-0 rounded bg-[var(--accent)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[var(--accent)]">
@@ -262,6 +294,7 @@ export interface SnippetsPanelProps {
   buckets: Bucket[];
   snippets: Snippet[];
   activeBucketId: string | null;
+  storageEstimate: StorageEstimate | null;
   onSetActive: (id: string) => void;
   onAddBucket: (name?: string) => void;
   onRemoveBucket: (id: string) => void;
@@ -274,6 +307,7 @@ export default function SnippetsPanel({
   buckets,
   snippets,
   activeBucketId,
+  storageEstimate,
   onSetActive,
   onAddBucket,
   onRemoveBucket,
@@ -296,6 +330,12 @@ export default function SnippetsPanel({
 
   const copyToClipboard = (text: string) => {
     try { void navigator.clipboard.writeText(text); } catch { /* ignore */ }
+  };
+
+  const copyAllSnippets = (bucketSnippets: Snippet[]) => {
+    // Oldest first for natural reading order (snippets are stored newest-first)
+    const text = [...bucketSnippets].reverse().map((s) => s.text).join('\n\n');
+    copyToClipboard(text);
   };
 
   const handleAdd = () => {
@@ -330,6 +370,7 @@ export default function SnippetsPanel({
                 onRename={onRenameBucket}
                 onRemove={onRemoveBucket}
                 onCopySnippet={copyToClipboard}
+                onCopyAll={copyAllSnippets}
                 onInsertSnippet={onInsertSnippet}
                 onDeleteSnippet={onDeleteSnippet}
               />
@@ -356,10 +397,37 @@ export default function SnippetsPanel({
             </button>
           </div>
 
-          <p className="text-[11px] italic text-[var(--muted)]">
-            Snippets are saved on this device only and kept for several days. A browser set to
-            clear data on exit (e.g. Brave Shields) may remove them sooner.
-          </p>
+          {/* Storage info */}
+          <div className="border-t border-[var(--surface-alt)] pt-2 space-y-1.5">
+            {storageEstimate && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span>Snippets: {formatStorageBytes(storageEstimate.snippetBytes)}</span>
+                  <span>Site total: {formatStorageBytes(storageEstimate.usageBytes)}{storageEstimate.quotaBytes > 0 ? ` / ${formatStorageBytes(storageEstimate.quotaBytes)}` : ''}</span>
+                </div>
+                {storageEstimate.quotaBytes > 0 && (
+                  <div className="w-full h-1.5 bg-[var(--bg-alt)] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        storageEstimate.usageBytes / storageEstimate.quotaBytes > 0.8
+                          ? 'bg-[var(--red)]'
+                          : 'bg-[var(--teal)]'
+                      }`}
+                      style={{ width: `${Math.min(100, (storageEstimate.usageBytes / storageEstimate.quotaBytes) * 100)}%` }}
+                    />
+                  </div>
+                )}
+                {isIOS() && (
+                  <p className="text-[11px] text-[var(--accent)]">
+                    iOS shares storage between the speech model (~40 MB) and snippets. If storage is tight, older snippets may be evicted.
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] italic text-[var(--muted)]">
+              Saved on this device only. Kept for 7 days, then pruned automatically.
+            </p>
+          </div>
         </div>
       )}
     </div>

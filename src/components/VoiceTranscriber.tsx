@@ -316,6 +316,22 @@ export default function VoiceTranscriber({
     (mode === 'api' || modelReady) &&
     (recorder.state === 'idle' || recorder.state === 'recording');
 
+  // Populate editor from active bucket's snippets on initial load and bucket switch.
+  const activeBucketIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!snippets.ready || !snippets.activeBucketId) return;
+    // Only repopulate when the active bucket actually changes (not on every snippet update)
+    if (activeBucketIdRef.current === snippets.activeBucketId) return;
+    activeBucketIdRef.current = snippets.activeBucketId;
+
+    const bucketSnippets = snippets.snippetsByBucket(snippets.activeBucketId);
+    if (bucketSnippets.length > 0) {
+      // Oldest first for natural reading order
+      const text = [...bucketSnippets].reverse().map((s) => s.text).join('\n');
+      setAccumulatedText(text);
+    }
+  }, [snippets.ready, snippets.activeBucketId, snippets.snippetsByBucket]);
+
   useEffect(() => {
     if (recorder.state === 'stopped' && recorder.audioBlob && activeWhisper.state === 'idle') {
       activeWhisper.transcribe(recorder.audioBlob);
@@ -328,9 +344,8 @@ export default function VoiceTranscriber({
     if (newText && newText !== prevWhisperTextRef.current) {
       setAccumulatedText(prev => prev ? prev + '\n' + newText : newText);
       prevWhisperTextRef.current = newText;
-      // Auto-save each finished transcript into the active bucket. The text guard
-      // above keeps this from re-saving when addSnippet's identity changes (e.g.
-      // the active bucket switches) without new transcript text.
+      // Auto-save each finished transcript into the active bucket. Dedup in
+      // useSnippets prevents double-saving identical text.
       addSnippet(newText);
     }
     if (!newText) {
@@ -538,6 +553,7 @@ export default function VoiceTranscriber({
           buckets={snippets.buckets}
           snippets={snippets.snippets}
           activeBucketId={snippets.activeBucketId}
+          storageEstimate={snippets.storageEstimate}
           onSetActive={snippets.setActiveBucket}
           onAddBucket={snippets.addBucket}
           onRemoveBucket={snippets.removeBucket}

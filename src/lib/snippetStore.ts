@@ -233,3 +233,32 @@ export async function setActiveBucketId(bucketId: string | null): Promise<void> 
     t.objectStore(STORE_META).put({ key: ACTIVE_BUCKET_KEY, value: bucketId }),
   );
 }
+
+export interface StorageEstimate {
+  usageBytes: number;
+  quotaBytes: number;
+  snippetBytes: number;
+}
+
+// Estimate storage usage. snippetBytes is an approximation based on text length
+// (2 bytes per char + overhead per record). usageBytes/quotaBytes come from the
+// Storage API and cover ALL site data (model cache + snippets + everything).
+export async function getStorageEstimate(snippets: Snippet[]): Promise<StorageEstimate> {
+  let usageBytes = 0;
+  let quotaBytes = 0;
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
+      const est = await navigator.storage.estimate();
+      usageBytes = est.usage ?? 0;
+      quotaBytes = est.quota ?? 0;
+    }
+  } catch { /* ignore */ }
+
+  // Approximate snippet storage: each snippet is text + metadata overhead (~100 bytes for IDs, timestamps).
+  let snippetBytes = 0;
+  for (const s of snippets) {
+    snippetBytes += s.text.length * 2 + 100;
+  }
+
+  return { usageBytes, quotaBytes, snippetBytes };
+}

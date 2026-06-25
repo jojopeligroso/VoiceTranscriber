@@ -161,10 +161,10 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       'automatic-speech-recognition',
       modelId,
       {
-        // q8 (8-bit) instead of fp32 cuts peak memory ~4x so the model fits
-        // under iOS Safari's per-tab limit. q8 uses standard quantized matmul
-        // (not the MatMulNBits op that forced fp32 originally — that was q4).
-        dtype: 'q8',
+        // iOS needs q8 (8-bit) to fit under Safari's per-tab memory ceiling.
+        // Desktop uses fp32 — the q8 ONNX variant uses MatMulNBits ops that
+        // Chromium's WASM runtime doesn't support.
+        dtype: isIOS() ? 'q8' : 'fp32',
         device: 'wasm',
         progress_callback: (event: {
           status: string;

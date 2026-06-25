@@ -22,12 +22,12 @@ export interface WhisperModel {
 }
 
 export const WHISPER_MODELS: WhisperModel[] = [
-  { id: 'onnx-community/whisper-tiny.en', label: 'Tiny', lang: 'English', size: '~40 MB' },
-  { id: 'onnx-community/whisper-tiny', label: 'Tiny', lang: 'Multilingual', size: '~40 MB' },
-  { id: 'onnx-community/whisper-base.en', label: 'Base', lang: 'English', size: '~75 MB' },
-  { id: 'onnx-community/whisper-base', label: 'Base', lang: 'Multilingual', size: '~75 MB' },
-  { id: 'onnx-community/whisper-small.en', label: 'Small', lang: 'English', size: '~250 MB' },
-  { id: 'onnx-community/whisper-small', label: 'Small', lang: 'Multilingual', size: '~250 MB' },
+  { id: 'onnx-community/whisper-tiny.en', label: 'Tiny', lang: 'English', size: '~150 MB' },
+  { id: 'onnx-community/whisper-tiny', label: 'Tiny', lang: 'Multilingual', size: '~150 MB' },
+  { id: 'onnx-community/whisper-base.en', label: 'Base', lang: 'English', size: '~290 MB' },
+  { id: 'onnx-community/whisper-base', label: 'Base', lang: 'Multilingual', size: '~290 MB' },
+  { id: 'onnx-community/whisper-small.en', label: 'Small', lang: 'English', size: '~950 MB' },
+  { id: 'onnx-community/whisper-small', label: 'Small', lang: 'Multilingual', size: '~950 MB' },
 ];
 
 export const DEFAULT_MODEL_ID = 'onnx-community/whisper-tiny.en';
@@ -161,10 +161,11 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       'automatic-speech-recognition',
       modelId,
       {
-        // iOS needs q8 (8-bit) to fit under Safari's per-tab memory ceiling.
-        // Desktop uses fp32 — the q8 ONNX variant uses MatMulNBits ops that
-        // Chromium's WASM runtime doesn't support.
-        dtype: isIOS() ? 'q8' : 'fp32',
+        // fp32 on all platforms. The q8 ONNX variant was re-published upstream
+        // with MatMulNBits ops that browser WASM runtimes don't support.
+        // Tiny English at fp32 is ~150 MB but still fits under iOS Safari's
+        // per-tab memory ceiling (Base/Small do not — that's the iOS lock).
+        dtype: 'fp32',
         device: 'wasm',
         progress_callback: (event: {
           status: string;

@@ -466,7 +466,7 @@ export default function SnippetsPanel({
                 )}
                 {isIOS() && (
                   <p className="text-[11px] text-[var(--accent)]">
-                    iOS shares storage between the speech model (~40 MB) and snippets. If storage is tight, older snippets may be evicted.
+                    iOS shares storage between the speech model (~150 MB) and snippets. If storage is tight, older snippets may be evicted.
                   </p>
                 )}
               </div>

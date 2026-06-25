@@ -57,7 +57,7 @@ Tailwind CSS v4 with CSS custom properties for theming (`var(--fg)`, `var(--acce
 ## Gotchas
 
 ### 1. iOS WebKit memory ceiling
-All iOS browsers use WebKit. Only the Tiny English model (~40MB) fits in memory — Base and Small both OOM and silently fail, leaving the user in a stuck loading loop. The app locks iOS to `whisper-tiny.en` and greys out other options. If you add a new model, gate it through `isModelAllowedOnPlatform()` in `useWhisperBrowser.ts`.
+All iOS browsers use WebKit with a per-tab WASM memory ceiling. At fp32, the Tiny English model (~150MB) fits comfortably. Base (~290MB) and Small (~950MB) risk hitting that ceiling, especially on older iPhones. The app locks iOS to `whisper-tiny.en` and greys out other options. If you add a new model, gate it through `isModelAllowedOnPlatform()` in `useWhisperBrowser.ts`.
 
 ### 2. Module-level pipeline cache
 `useWhisperBrowser` caches the Whisper pipeline at **module level** (not component level) so it survives React remounts. The download promise is also cached to prevent duplicate downloads. Don't move this into component state or it will re-download on every mount.

@@ -190,7 +190,7 @@ function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult:
               <li><strong className="text-[var(--fg)]">Tap Get Ready</strong> — allow microphone access when prompted</li>
               <li><strong className="text-[var(--fg)]">Speak clearly</strong> — the app records audio locally on your device</li>
               <li><strong className="text-[var(--fg)]">Tap Stop</strong> — transcription begins automatically</li>
-              <li><strong className="text-[var(--fg)]">Wait</strong> — the model processes your audio (first time takes longer as it downloads ~40 MB)</li>
+              <li><strong className="text-[var(--fg)]">Wait</strong> — the model processes your audio (first time takes longer as it downloads the speech model)</li>
               <li><strong className="text-[var(--fg)]">Record more</strong> — each clip's text is added to your document. Record as many clips as you need.</li>
               <li><strong className="text-[var(--fg)]">Edit if needed</strong> — tap the text to make corrections</li>
               <li><strong className="text-[var(--fg)]">Copy</strong> — tap the copy icon to grab your text</li>
@@ -214,7 +214,7 @@ function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult:
             <ul className="space-y-1">
               <li>Uses <strong className="text-[var(--fg)]">Whisper {currentModel?.label ?? 'Tiny'} {currentModel?.lang ?? 'English'}</strong> — a speech recognition model that runs entirely in your browser</li>
               <li>Audio never leaves your device</li>
-              <li>{currentModel?.size ?? '~40 MB'} model downloads once, then cached for future visits</li>
+              <li>{currentModel?.size ?? '~150 MB'} model downloads once, then cached for future visits</li>
               <li>Best for: short dictation, quick notes, voice memos</li>
               <li>Not ideal for: long meetings, multiple speakers, noisy environments</li>
             </ul>
@@ -553,7 +553,7 @@ export default function VoiceTranscriber({
             models={availableModels}
             note={isIOS()
               ? "Due to the type of device you're using (mobile / iOS), only this Tiny model is available — larger models exceed the memory limits of mobile browsers."
-              : "On iPhone & iPad only the Tiny (~40 MB) model works — larger ones exceed mobile browser memory limits. If a model won't load on your device, switch to a smaller one."}
+              : "On iPhone & iPad only the Tiny (~150 MB) model is available — larger models may exceed mobile browser memory limits."}
           />
         )}
       </div>

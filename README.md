@@ -22,7 +22,7 @@ Open http://localhost:3000.
 
 | Mode | Privacy | Quality | Speed |
 |---|---|---|---|
-| **Browser** (default) | Audio never leaves your device | Good (Whisper tiny English) | ~40MB model download on first use |
+| **Browser** (default) | Audio never leaves your device | Good (Whisper tiny English) | ~150MB model download on first use |
 | **API** (opt-in) | Audio sent to OpenAI | Better (Whisper large) | Fast, requires API key |
 
 ## Environment Variables

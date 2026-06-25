@@ -49,11 +49,11 @@ export function isIOS(): boolean {
 }
 
 // The single model allowed on iOS. iOS Safari/WebKit imposes a hard per-tab
-// memory ceiling and a small Cache Storage quota: anything beyond the ~40 MB
-// Tiny model refuses to run (Base ~75 MB and Small ~250 MB both fail, cached or
-// not). We lock iOS to the English-only Tiny model — the smallest, most reliable
-// option — rather than also offering the multilingual Tiny. All iOS browsers use
-// WebKit, so this also covers Chrome/Firefox/Edge/Brave on iPhone and iPad.
+// WASM memory ceiling. At fp32, Tiny is ~150 MB which works. Base (~290 MB) and
+// Small (~950 MB) risk hitting the ceiling, especially on older iPhones. We lock
+// iOS to the English-only Tiny model — the smallest, most reliable option.
+// All iOS browsers use WebKit, so this covers Chrome/Firefox/Edge/Brave on
+// iPhone and iPad too.
 export const IOS_ALLOWED_MODEL_ID = DEFAULT_MODEL_ID; // 'onnx-community/whisper-tiny.en'
 
 // Whether a given model may be selected on the current platform. On iOS only the

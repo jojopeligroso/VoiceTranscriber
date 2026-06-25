@@ -552,8 +552,8 @@ export default function VoiceTranscriber({
             disabled={recorder.state === 'recording' || whisperBrowser.state === 'transcribing'}
             models={availableModels}
             note={isIOS()
-              ? "Due to the type of device you're using (mobile / iOS), only this Tiny model is available — larger models exceed the memory limits of mobile browsers."
-              : "On iPhone & iPad only the Tiny (~150 MB) model is available — larger models may exceed mobile browser memory limits."}
+              ? "Small models (~950 MB) are disabled on iOS — they exceed the memory limit of mobile browsers. Tiny and Base should work. If Base fails to load, switch back to Tiny."
+              : "On iPhone & iPad, Small models are disabled (they exceed mobile browser memory limits). Tiny and Base work."}
           />
         )}
       </div>

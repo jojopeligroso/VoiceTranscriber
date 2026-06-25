@@ -48,18 +48,22 @@ export function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// The single model allowed on iOS. iOS Safari/WebKit imposes a hard per-tab
-// WASM memory ceiling. At fp32, Tiny is ~150 MB which works. Base (~290 MB) and
-// Small (~950 MB) risk hitting the ceiling, especially on older iPhones. We lock
-// iOS to the English-only Tiny model — the smallest, most reliable option.
-// All iOS browsers use WebKit, so this covers Chrome/Firefox/Edge/Brave on
-// iPhone and iPad too.
-export const IOS_ALLOWED_MODEL_ID = DEFAULT_MODEL_ID; // 'onnx-community/whisper-tiny.en'
+// Models allowed on iOS. iOS Safari/WebKit imposes a per-tab WASM memory
+// ceiling. At fp32, Tiny (~150 MB) and Base (~290 MB) fit on most iPhones.
+// Small (~950 MB) exceeds the ceiling and will OOM. All iOS browsers use WebKit,
+// so this covers Chrome/Firefox/Edge/Brave on iPhone and iPad too.
+export const IOS_ALLOWED_MODEL_ID = DEFAULT_MODEL_ID; // default selection on iOS
+const IOS_ALLOWED_IDS = new Set([
+  'onnx-community/whisper-tiny.en',
+  'onnx-community/whisper-tiny',
+  'onnx-community/whisper-base.en',
+  'onnx-community/whisper-base',
+]);
 
-// Whether a given model may be selected on the current platform. On iOS only the
-// single allowed Tiny English model is permitted; every other platform allows all.
+// Whether a given model may be selected on the current platform. On iOS, Small
+// models are blocked (OOM); Tiny and Base are allowed. All platforms allow all.
 export function isModelAllowedOnPlatform(id: string): boolean {
-  return !isIOS() || id === IOS_ALLOWED_MODEL_ID;
+  return !isIOS() || IOS_ALLOWED_IDS.has(id);
 }
 
 // Module-level cache so the pipeline persists across component remounts

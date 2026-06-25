@@ -109,26 +109,45 @@ function SnippetRow({
   onDelete,
 }: {
   snippet: Snippet;
-  onCopy: (text: string) => void;
+  onCopy: (text: string) => Promise<boolean>;
   onInsert?: (text: string) => void;
   onDelete: (id: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const handleCopy = async () => {
+    const ok = await onCopy(snippet.text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } else {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
+  };
   return (
     <div className="flex items-start gap-2 rounded-md bg-[var(--bg-alt)] px-2.5 py-2">
       <p className="flex-1 text-xs text-[var(--fg)] whitespace-pre-wrap break-words">{snippet.text}</p>
       <div className="flex shrink-0 items-center gap-0.5">
         <button
-          onClick={() => { onCopy(snippet.text); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
-          className="p-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
-          title="Copy snippet"
+          onClick={handleCopy}
+          className="p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
+          aria-label={copyFailed ? 'Copy failed' : 'Copy snippet'}
+          title={copyFailed ? 'Copy failed' : 'Copy snippet'}
         >
-          {copied ? <CheckIcon className="w-4 h-4 text-[var(--teal)]" /> : <CopyIcon className="w-4 h-4" />}
+          {copied ? (
+            <CheckIcon className="w-4 h-4 text-[var(--teal)]" />
+          ) : copyFailed ? (
+            <CopyIcon className="w-4 h-4 text-[var(--red)]" />
+          ) : (
+            <CopyIcon className="w-4 h-4" />
+          )}
         </button>
         {onInsert && (
           <button
             onClick={() => onInsert(snippet.text)}
-            className="p-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
+            className="p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
+            aria-label="Insert into editor"
             title="Insert into editor"
           >
             <InsertIcon className="w-4 h-4" />
@@ -136,7 +155,8 @@ function SnippetRow({
         )}
         <button
           onClick={() => onDelete(snippet.id)}
-          className="p-1 rounded text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
+          className="p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
+          aria-label="Delete snippet"
           title="Delete snippet"
         >
           <TrashIcon className="w-4 h-4" />
@@ -168,8 +188,8 @@ function BucketSection({
   onSetActive: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onRemove: (id: string) => void;
-  onCopySnippet: (text: string) => void;
-  onCopyAll: (snippets: Snippet[]) => void;
+  onCopySnippet: (text: string) => Promise<boolean>;
+  onCopyAll: (snippets: Snippet[]) => Promise<boolean>;
   onInsertSnippet?: (text: string) => void;
   onDeleteSnippet: (id: string) => void;
 }) {
@@ -177,6 +197,7 @@ function BucketSection({
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(bucket.name);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [copyAllFailed, setCopyAllFailed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -231,11 +252,27 @@ function BucketSection({
 
         {snippets.length > 0 && (
           <button
-            onClick={() => { onCopyAll(snippets); setCopiedAll(true); setTimeout(() => setCopiedAll(false), 1200); }}
-            className="shrink-0 p-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-alt)] transition-colors"
-            title="Copy all snippets"
+            onClick={async () => {
+              const ok = await onCopyAll(snippets);
+              if (ok) {
+                setCopiedAll(true);
+                setTimeout(() => setCopiedAll(false), 1200);
+              } else {
+                setCopyAllFailed(true);
+                setTimeout(() => setCopyAllFailed(false), 2000);
+              }
+            }}
+            className="shrink-0 p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-alt)] transition-colors"
+            aria-label={copyAllFailed ? 'Copy all failed' : 'Copy all snippets'}
+            title={copyAllFailed ? 'Copy all failed' : 'Copy all snippets'}
           >
-            {copiedAll ? <CheckIcon className="w-4 h-4 text-[var(--teal)]" /> : <ClipboardListIcon className="w-4 h-4" />}
+            {copiedAll ? (
+              <CheckIcon className="w-4 h-4 text-[var(--teal)]" />
+            ) : copyAllFailed ? (
+              <ClipboardListIcon className="w-4 h-4 text-[var(--red)]" />
+            ) : (
+              <ClipboardListIcon className="w-4 h-4" />
+            )}
           </button>
         )}
 
@@ -256,11 +293,12 @@ function BucketSection({
         <button
           onClick={() => onRemove(bucket.id)}
           disabled={!canRemove}
-          className={`shrink-0 p-1 rounded transition-colors ${
+          className={`shrink-0 p-2 -m-1 rounded transition-colors ${
             canRemove
               ? 'text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface-alt)]'
               : 'text-[var(--muted)]/30 cursor-not-allowed'
           }`}
+          aria-label={canRemove ? 'Delete bucket and its snippets' : "Can't delete the last bucket"}
           title={canRemove ? 'Delete bucket and its snippets' : "Can't delete the last bucket"}
         >
           <TrashIcon className="w-4 h-4" />
@@ -328,14 +366,23 @@ export default function SnippetsPanel({
     return map;
   }, [snippets]);
 
-  const copyToClipboard = (text: string) => {
-    try { void navigator.clipboard.writeText(text); } catch { /* ignore */ }
+  // Clipboard write can reject (insecure context, permission denied, no user
+  // gesture chain on some mobile browsers). Return success so the UI can show a
+  // truthful affordance instead of pretending everything worked.
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return false;
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const copyAllSnippets = (bucketSnippets: Snippet[]) => {
+  const copyAllSnippets = async (bucketSnippets: Snippet[]): Promise<boolean> => {
     // Oldest first for natural reading order (snippets are stored newest-first)
     const text = [...bucketSnippets].reverse().map((s) => s.text).join('\n\n');
-    copyToClipboard(text);
+    return copyToClipboard(text);
   };
 
   const handleAdd = () => {

@@ -235,7 +235,7 @@ function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult:
             </button>
             {showTechnical && (
               <ul className="mt-2 space-y-1">
-                <li>Model: <code className="text-[var(--accent)]">{currentModel?.id ?? 'onnx-community/whisper-tiny.en'}</code> (q8, WASM)</li>
+                <li>Model: <code className="text-[var(--accent)]">{currentModel?.id ?? 'onnx-community/whisper-tiny.en'}</code> (fp32, WASM)</li>
                 <li>Audio: 16 kHz mono, processed in 28-second chunks</li>
                 <li>Works in Chrome, Firefox, Edge. Safari has limited support.</li>
                 <li>In-app browsers (Telegram, WhatsApp) may not work — use your default browser</li>
@@ -283,7 +283,12 @@ export default function VoiceTranscriber({
     // any previously-saved larger model so a returning user can't get stuck in
     // the out-of-memory download loop.
     if (isIOS()) return IOS_ALLOWED_MODEL_ID;
-    return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
+    // localStorage can throw in iOS Safari private browsing — guard the read.
+    try {
+      return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
+    } catch {
+      return DEFAULT_MODEL_ID;
+    }
   });
 
   // If iOS had a stale larger model saved, correct the persisted value so it
@@ -299,7 +304,8 @@ export default function VoiceTranscriber({
     // (the disabled buttons already prevent this, but guard anyway).
     if (!isModelAllowedOnPlatform(id)) return;
     setBrowserModelId(id);
-    localStorage.setItem(MODEL_STORAGE_KEY, id);
+    // localStorage can throw in private browsing — selection still works in-memory.
+    try { localStorage.setItem(MODEL_STORAGE_KEY, id); } catch { /* ignore */ }
   };
 
   const recorder = useAudioRecorder(maxDuration);
@@ -317,19 +323,23 @@ export default function VoiceTranscriber({
     (recorder.state === 'idle' || recorder.state === 'recording');
 
   // Populate editor from active bucket's snippets on initial load and bucket switch.
+  // Hardening: never overwrite text the user has already typed/recorded. We only
+  // auto-fill when the editor is empty — otherwise switching buckets mid-dictation
+  // would silently destroy their work. They can still tap "Clear" to reset.
   const activeBucketIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!snippets.ready || !snippets.activeBucketId) return;
-    // Only repopulate when the active bucket actually changes (not on every snippet update)
     if (activeBucketIdRef.current === snippets.activeBucketId) return;
     activeBucketIdRef.current = snippets.activeBucketId;
 
-    const bucketSnippets = snippets.snippetsByBucket(snippets.activeBucketId);
-    if (bucketSnippets.length > 0) {
+    // Don't trample existing editor content — only seed an empty editor.
+    setAccumulatedText((prev) => {
+      if (prev) return prev;
+      const bucketSnippets = snippets.snippetsByBucket(snippets.activeBucketId!);
+      if (bucketSnippets.length === 0) return prev;
       // Oldest first for natural reading order
-      const text = [...bucketSnippets].reverse().map((s) => s.text).join('\n');
-      setAccumulatedText(text);
-    }
+      return [...bucketSnippets].reverse().map((s) => s.text).join('\n');
+    });
   }, [snippets.ready, snippets.activeBucketId, snippets.snippetsByBucket]);
 
   useEffect(() => {
@@ -532,7 +542,7 @@ export default function VoiceTranscriber({
       <div className="flex items-center justify-center gap-1">
         <InfoPanel
           mode={mode}
-          lastResult={whisperBrowser.lastResult}
+          lastResult={activeWhisper.lastResult}
           currentModel={WHISPER_MODELS.find(m => m.id === browserModelId)}
         />
         {mode === 'browser' && (

@@ -8,6 +8,7 @@ type APIState = 'idle' | 'transcribing' | 'done' | 'error';
 export function useWhisperAPI(apiEndpoint = '/api/transcribe') {
   const [state, setState] = useState<APIState>('idle');
   const [text, setText] = useState('');
+  const [lastResult, setLastResult] = useState<TranscriptionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const transcribe = useCallback(async (blob: Blob): Promise<TranscriptionResult | null> => {
@@ -35,6 +36,7 @@ export function useWhisperAPI(apiEndpoint = '/api/transcribe') {
       };
 
       setText(result.text);
+      setLastResult(result);
       setState('done');
       return result;
     } catch (err) {
@@ -51,5 +53,5 @@ export function useWhisperAPI(apiEndpoint = '/api/transcribe') {
     setError(null);
   }, []);
 
-  return { transcribe, text, state, error, reset };
+  return { transcribe, text, lastResult, state, error, reset };
 }

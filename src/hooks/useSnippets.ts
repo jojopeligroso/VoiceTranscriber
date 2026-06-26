@@ -8,6 +8,7 @@ import {
   putSnippet,
   deleteSnippet as dbDeleteSnippet,
   setActiveBucketId as dbSetActiveBucketId,
+  setBucketOrder as dbSetBucketOrder,
   getStorageEstimate,
   requestPersistence,
   newId,
@@ -38,6 +39,7 @@ export interface UseSnippets {
   renameBucket: (bucketId: string, name: string) => void;
   addSnippet: (text: string, bucketId?: string) => void;
   removeSnippet: (snippetId: string) => void;
+  moveBucket: (bucketId: string, direction: 'up' | 'down') => void;
 }
 
 export function useSnippets(): UseSnippets {
@@ -110,7 +112,9 @@ export function useSnippets(): UseSnippets {
         };
         createdId = bucket.id;
         void putBucket(bucket);
-        return [...prev, bucket];
+        const next = [...prev, bucket];
+        void dbSetBucketOrder(next.map((b) => b.id));
+        return next;
       });
       return createdId;
     },
@@ -123,6 +127,7 @@ export function useSnippets(): UseSnippets {
       setSnippets((prev) => prev.filter((s) => s.bucketId !== bucketId));
       setBuckets((prev) => {
         const next = prev.filter((b) => b.id !== bucketId);
+        void dbSetBucketOrder(next.map((b) => b.id));
         // If we removed the active bucket, move the selection to the first
         // remaining bucket (or null if none remain).
         setActiveBucketIdState((curActive) => {
@@ -182,6 +187,19 @@ export function useSnippets(): UseSnippets {
     [activeBucketId, refreshStorage],
   );
 
+  const moveBucket = useCallback((bucketId: string, direction: 'up' | 'down') => {
+    setBuckets((prev) => {
+      const idx = prev.findIndex((b) => b.id === bucketId);
+      if (idx === -1) return prev;
+      const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+      void dbSetBucketOrder(next.map((b) => b.id));
+      return next;
+    });
+  }, []);
+
   const removeSnippet = useCallback((snippetId: string) => {
     void dbDeleteSnippet(snippetId);
     setSnippets((prev) => {
@@ -210,5 +228,6 @@ export function useSnippets(): UseSnippets {
     renameBucket,
     addSnippet,
     removeSnippet,
+    moveBucket,
   };
 }

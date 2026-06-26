@@ -274,6 +274,10 @@ export default function VoiceTranscriber({
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [inAppWarningDismissed, setInAppWarningDismissed] = useState(false);
   const [accumulatedText, setAccumulatedText] = useState('');
+  const [appendMode, setAppendMode] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return localStorage.getItem('vt-append-mode') !== 'false'; } catch { return true; }
+  });
   const prevWhisperTextRef = useRef('');
   const inApp = isInAppBrowser();
   const availableModels = modelsForPlatform();
@@ -349,10 +353,16 @@ export default function VoiceTranscriber({
   }, [recorder.state, recorder.audioBlob, activeWhisper]);
 
   const addSnippet = snippets.addSnippet;
+  const appendModeRef = useRef(appendMode);
+  useEffect(() => { appendModeRef.current = appendMode; }, [appendMode]);
   useEffect(() => {
     const newText = activeWhisper.text;
     if (newText && newText !== prevWhisperTextRef.current) {
-      setAccumulatedText(prev => prev ? prev + '\n' + newText : newText);
+      if (appendModeRef.current) {
+        setAccumulatedText(prev => prev ? prev + '\n' + newText : newText);
+      } else {
+        setAccumulatedText(newText);
+      }
       prevWhisperTextRef.current = newText;
       // Auto-save each finished transcript into the active bucket. Dedup in
       // useSnippets prevents double-saving identical text.
@@ -390,6 +400,14 @@ export default function VoiceTranscriber({
     whisperBrowser.reset();
     whisperAPI.reset();
   };
+
+  const handleToggleAppendMode = useCallback(() => {
+    setAppendMode((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('vt-append-mode', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   const handleInsertSnippet = useCallback((text: string) => {
     setAccumulatedText(prev => (prev ? prev + '\n' + text : text));
@@ -515,6 +533,8 @@ export default function VoiceTranscriber({
             buckets={snippets.buckets}
             activeBucketId={snippets.activeBucketId}
             onSelect={snippets.setActiveBucket}
+            appendMode={appendMode}
+            onToggleAppendMode={handleToggleAppendMode}
           />
         </div>
       )}
@@ -570,6 +590,7 @@ export default function VoiceTranscriber({
           onRenameBucket={snippets.renameBucket}
           onDeleteSnippet={snippets.removeSnippet}
           onInsertSnippet={handleInsertSnippet}
+          onMoveBucket={snippets.moveBucket}
         />
       )}
     </div>

@@ -66,6 +66,35 @@ function ChevronIcon({ className }: { className?: string }) {
   );
 }
 
+function GripIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="5" r="1.5" />
+      <circle cx="15" cy="5" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="19" r="1.5" />
+      <circle cx="15" cy="19" r="1.5" />
+    </svg>
+  );
+}
+
+function ArrowUpIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m18 15-6-6-6 6" />
+    </svg>
+  );
+}
+
+function ArrowDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 // ── Active-bucket bar ───────────────────────────────────────────────────────
 // Compact "Saving to: [bucket ▾]" control. Sits near the transcript so the user
 // always knows where finished transcripts are being auto-saved.
@@ -74,10 +103,14 @@ export function ActiveBucketBar({
   buckets,
   activeBucketId,
   onSelect,
+  appendMode,
+  onToggleAppendMode,
 }: {
   buckets: Bucket[];
   activeBucketId: string | null;
   onSelect: (id: string) => void;
+  appendMode: boolean;
+  onToggleAppendMode: () => void;
 }) {
   if (buckets.length === 0) return null;
   return (
@@ -96,6 +129,17 @@ export function ActiveBucketBar({
         </select>
         <ChevronIcon className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--muted)]" />
       </div>
+      <button
+        onClick={onToggleAppendMode}
+        className="flex items-center gap-1.5 shrink-0 rounded-md border border-[var(--surface-alt)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+        title={appendMode ? 'Append mode: new recordings add to existing text' : 'Replace mode: new recordings replace existing text'}
+        aria-label={appendMode ? 'Switch to replace mode' : 'Switch to append mode'}
+      >
+        <span className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${appendMode ? 'bg-[var(--teal)]' : 'bg-[var(--surface-alt)]'}`}>
+          <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white transition-transform ${appendMode ? 'translate-x-2.5' : 'translate-x-0.5'}`} />
+        </span>
+        <span>{appendMode ? 'Append' : 'Replace'}</span>
+      </button>
     </div>
   );
 }
@@ -173,6 +217,9 @@ function BucketSection({
   snippets,
   isActive,
   canRemove,
+  reordering,
+  isFirst,
+  isLast,
   onSetActive,
   onRename,
   onRemove,
@@ -180,11 +227,15 @@ function BucketSection({
   onCopyAll,
   onInsertSnippet,
   onDeleteSnippet,
+  onMove,
 }: {
   bucket: Bucket;
   snippets: Snippet[];
   isActive: boolean;
   canRemove: boolean;
+  reordering: boolean;
+  isFirst: boolean;
+  isLast: boolean;
   onSetActive: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onRemove: (id: string) => void;
@@ -192,6 +243,7 @@ function BucketSection({
   onCopyAll: (snippets: Snippet[]) => Promise<boolean>;
   onInsertSnippet?: (text: string) => void;
   onDeleteSnippet: (id: string) => void;
+  onMove: (id: string, direction: 'up' | 'down') => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -213,15 +265,38 @@ function BucketSection({
   };
 
   return (
-    <div className="rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)]">
+    <div className={`rounded-lg border bg-[var(--surface)] transition-colors ${reordering ? 'border-[var(--accent)]/30' : 'border-[var(--surface-alt)]'}`}>
       <div className="flex items-center gap-2 px-2.5 py-2">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors shrink-0"
-          title={expanded ? 'Collapse' : 'Expand'}
-        >
-          <ChevronIcon className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        </button>
+        {reordering ? (
+          <div className="flex shrink-0 flex-col gap-0.5">
+            <button
+              onClick={() => onMove(bucket.id, 'up')}
+              disabled={isFirst}
+              className={`p-0.5 rounded transition-colors ${isFirst ? 'text-[var(--muted)]/30 cursor-not-allowed' : 'text-[var(--muted)] hover:text-[var(--accent)]'}`}
+              aria-label="Move up"
+              title="Move up"
+            >
+              <ArrowUpIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onMove(bucket.id, 'down')}
+              disabled={isLast}
+              className={`p-0.5 rounded transition-colors ${isLast ? 'text-[var(--muted)]/30 cursor-not-allowed' : 'text-[var(--muted)] hover:text-[var(--accent)]'}`}
+              aria-label="Move down"
+              title="Move down"
+            >
+              <ArrowDownIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-[var(--muted)] hover:text-[var(--fg)] transition-colors shrink-0"
+            title={expanded ? 'Collapse' : 'Expand'}
+          >
+            <ChevronIcon className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        )}
 
         {editingName ? (
           <input
@@ -339,6 +414,7 @@ export interface SnippetsPanelProps {
   onRenameBucket: (id: string, name: string) => void;
   onDeleteSnippet: (id: string) => void;
   onInsertSnippet?: (text: string) => void;
+  onMoveBucket: (id: string, direction: 'up' | 'down') => void;
 }
 
 export default function SnippetsPanel({
@@ -352,8 +428,10 @@ export default function SnippetsPanel({
   onRenameBucket,
   onDeleteSnippet,
   onInsertSnippet,
+  onMoveBucket,
 }: SnippetsPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [newName, setNewName] = useState('');
 
   const byBucket = useMemo(() => {
@@ -395,24 +473,39 @@ export default function SnippetsPanel({
 
   return (
     <div className="w-full text-xs text-[var(--muted)]">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-center gap-1.5 py-1 hover:text-[var(--fg)] transition-colors"
-      >
-        <span>Snippets &amp; buckets{snippets.length > 0 ? ` (${snippets.length})` : ''}</span>
-        <ChevronIcon className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
+      <div className="flex w-full items-center justify-center gap-1.5">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1.5 py-1 hover:text-[var(--fg)] transition-colors"
+        >
+          <span>Snippets &amp; buckets{snippets.length > 0 ? ` (${snippets.length})` : ''}</span>
+          <ChevronIcon className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+        {expanded && buckets.length > 1 && (
+          <button
+            onClick={() => setReordering(!reordering)}
+            className={`p-1 rounded-md transition-colors ${reordering ? 'text-[var(--accent)] bg-[var(--accent)]/10' : 'text-[var(--muted)] hover:text-[var(--fg)]'}`}
+            title={reordering ? 'Done reordering' : 'Reorder buckets'}
+            aria-label={reordering ? 'Done reordering' : 'Reorder buckets'}
+          >
+            <GripIcon className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       {expanded && (
         <div className="mt-2 flex flex-col gap-2 rounded-lg border border-[var(--surface-alt)] bg-[var(--surface)] p-3">
           <div className="flex flex-col gap-2">
-            {buckets.map((b) => (
+            {buckets.map((b, i) => (
               <BucketSection
                 key={b.id}
                 bucket={b}
                 snippets={byBucket.get(b.id) ?? []}
                 isActive={b.id === activeBucketId}
                 canRemove={buckets.length > 1}
+                reordering={reordering}
+                isFirst={i === 0}
+                isLast={i === buckets.length - 1}
                 onSetActive={onSetActive}
                 onRename={onRenameBucket}
                 onRemove={onRemoveBucket}
@@ -420,6 +513,7 @@ export default function SnippetsPanel({
                 onCopyAll={copyAllSnippets}
                 onInsertSnippet={onInsertSnippet}
                 onDeleteSnippet={onDeleteSnippet}
+                onMove={onMoveBucket}
               />
             ))}
           </div>

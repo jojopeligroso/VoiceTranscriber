@@ -38,6 +38,7 @@ export const SNIPPET_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_BUCKETS = 12;
 
 export const ACTIVE_BUCKET_KEY = 'activeBucketId';
+export const BUCKET_ORDER_KEY = 'bucketOrder';
 
 export function newId(): string {
   try {
@@ -153,7 +154,15 @@ export async function loadAll(): Promise<SnapshotData> {
     getAll<{ key: string; value: string }>(db, STORE_META),
   ]);
 
-  buckets.sort((a, b) => a.createdAt - b.createdAt);
+  // Sort buckets by persisted order if available, otherwise by creation time.
+  const orderJson = meta.find((m) => m.key === BUCKET_ORDER_KEY)?.value;
+  const order: string[] = orderJson ? JSON.parse(orderJson) : [];
+  if (order.length > 0) {
+    const orderMap = new Map(order.map((id, i) => [id, i]));
+    buckets.sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
+  } else {
+    buckets.sort((a, b) => a.createdAt - b.createdAt);
+  }
   snippets.sort((a, b) => b.createdAt - a.createdAt);
   const active = meta.find((m) => m.key === ACTIVE_BUCKET_KEY)?.value ?? null;
 
@@ -224,6 +233,14 @@ export async function deleteSnippet(snippetId: string): Promise<void> {
   const db = await openDB();
   if (!db) return;
   await tx(db, STORE_SNIPPETS, 'readwrite', (t) => t.objectStore(STORE_SNIPPETS).delete(snippetId));
+}
+
+export async function setBucketOrder(order: string[]): Promise<void> {
+  const db = await openDB();
+  if (!db) return;
+  await tx(db, STORE_META, 'readwrite', (t) =>
+    t.objectStore(STORE_META).put({ key: BUCKET_ORDER_KEY, value: JSON.stringify(order) }),
+  );
 }
 
 export async function setActiveBucketId(bucketId: string | null): Promise<void> {

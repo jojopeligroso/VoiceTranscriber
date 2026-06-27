@@ -273,7 +273,19 @@ export default function VoiceTranscriber({
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [inAppWarningDismissed, setInAppWarningDismissed] = useState(false);
-  const [accumulatedText, setAccumulatedText] = useState('');
+  const [accumulatedText, setAccumulatedTextRaw] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try { return sessionStorage.getItem('vt-editor-text') ?? ''; } catch { return ''; }
+  });
+  // Wrap setter to mirror editor text into sessionStorage so it survives iOS tab
+  // kills (which destroy React state but preserve sessionStorage).
+  const setAccumulatedText: typeof setAccumulatedTextRaw = useCallback((value) => {
+    setAccumulatedTextRaw((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value;
+      try { sessionStorage.setItem('vt-editor-text', next); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const [appendMode, setAppendMode] = useState(() => {
     if (typeof window === 'undefined') return true;
     try { return localStorage.getItem('vt-append-mode') !== 'false'; } catch { return true; }

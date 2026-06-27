@@ -58,10 +58,36 @@ function idbAvailable(): boolean {
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
+let dbInstance: IDBDatabase | null = null;
+
+// Invalidate the cached connection so the next call re-opens.
+function invalidateDB(): void {
+  dbInstance = null;
+  dbPromise = null;
+}
+
+// Check if the cached IDB connection is still usable. iOS suspends tabs and
+// can close the connection underneath us; all subsequent writes then fail
+// silently. This is the primary cause of snippet loss on iPad.
+function isConnectionAlive(): boolean {
+  if (!dbInstance) return false;
+  try {
+    // Attempting a transaction on a closed connection throws InvalidStateError.
+    const t = dbInstance.transaction(STORE_META, 'readonly');
+    t.abort();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function openDB(): Promise<IDBDatabase | null> {
   if (!idbAvailable()) return Promise.resolve(null);
-  if (dbPromise) return dbPromise;
+  // Re-validate the cached connection — iOS can silently close it when the tab
+  // is suspended and later resumed.
+  if (dbPromise && dbInstance && isConnectionAlive()) return dbPromise;
+  // Connection is stale or missing — re-open.
+  invalidateDB();
 
   dbPromise = new Promise<IDBDatabase | null>((resolve) => {
     let req: IDBOpenDBRequest;
@@ -84,12 +110,31 @@ function openDB(): Promise<IDBDatabase | null> {
         db.createObjectStore(STORE_META, { keyPath: 'key' });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      dbInstance = db;
+      // iOS can close the connection at any time (tab suspend, memory pressure).
+      // When it does, invalidate the cache so the next operation re-opens.
+      db.onclose = () => invalidateDB();
+      db.onversionchange = () => { db.close(); invalidateDB(); };
+      resolve(db);
+    };
     req.onerror = () => resolve(null);
     req.onblocked = () => resolve(null);
   });
 
   return dbPromise;
+}
+
+// Re-validate the connection when the tab becomes visible again. iOS kills IDB
+// connections during background suspension; this ensures we reconnect before the
+// user's next action.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && dbInstance && !isConnectionAlive()) {
+      invalidateDB();
+    }
+  });
 }
 
 function tx<T>(

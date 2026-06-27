@@ -131,14 +131,15 @@ export function ActiveBucketBar({
       </div>
       <button
         onClick={onToggleAppendMode}
-        className="flex items-center gap-1.5 shrink-0 rounded-md border border-[var(--surface-alt)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+        className="flex items-center gap-1.5 shrink-0 rounded-md border border-[var(--surface-alt)] bg-[var(--surface)] px-2 py-1 text-xs hover:bg-[var(--surface-alt)] transition-colors cursor-pointer"
         title={appendMode ? 'Append mode: new recordings add to existing text' : 'Replace mode: new recordings replace existing text'}
         aria-label={appendMode ? 'Switch to replace mode' : 'Switch to append mode'}
       >
+        <span className={`transition-colors ${appendMode ? 'text-[var(--muted)]' : 'text-[var(--fg)] font-medium'}`}>Replace</span>
         <span className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors ${appendMode ? 'bg-[var(--teal)]' : 'bg-[var(--surface-alt)]'}`}>
           <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white transition-transform ${appendMode ? 'translate-x-2.5' : 'translate-x-0.5'}`} />
         </span>
-        <span>{appendMode ? 'Append' : 'Replace'}</span>
+        <span className={`transition-colors ${appendMode ? 'text-[var(--fg)] font-medium' : 'text-[var(--muted)]'}`}>Append</span>
       </button>
     </div>
   );

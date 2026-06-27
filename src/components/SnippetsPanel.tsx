@@ -176,7 +176,7 @@ function SnippetRow({
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           onClick={handleCopy}
-          className="p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
+          className="p-2.5 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
           aria-label={copyFailed ? 'Copy failed' : 'Copy snippet'}
           title={copyFailed ? 'Copy failed' : 'Copy snippet'}
         >
@@ -191,7 +191,7 @@ function SnippetRow({
         {onInsert && (
           <button
             onClick={() => onInsert(snippet.text)}
-            className="p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
+            className="p-2.5 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
             aria-label="Insert into editor"
             title="Insert into editor"
           >
@@ -200,7 +200,7 @@ function SnippetRow({
         )}
         <button
           onClick={() => onDelete(snippet.id)}
-          className="p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
+          className="p-2.5 -m-1 rounded text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface)] transition-colors"
           aria-label="Delete snippet"
           title="Delete snippet"
         >
@@ -338,7 +338,7 @@ function BucketSection({
                 setTimeout(() => setCopyAllFailed(false), 2000);
               }
             }}
-            className="shrink-0 p-2 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-alt)] transition-colors"
+            className="shrink-0 p-2.5 -m-1 rounded text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-alt)] transition-colors"
             aria-label={copyAllFailed ? 'Copy all failed' : 'Copy all snippets'}
             title={copyAllFailed ? 'Copy all failed' : 'Copy all snippets'}
           >
@@ -369,7 +369,7 @@ function BucketSection({
         <button
           onClick={() => onRemove(bucket.id)}
           disabled={!canRemove}
-          className={`shrink-0 p-2 -m-1 rounded transition-colors ${
+          className={`shrink-0 p-2.5 -m-1 rounded transition-colors ${
             canRemove
               ? 'text-[var(--muted)] hover:text-[var(--red)] hover:bg-[var(--surface-alt)]'
               : 'text-[var(--muted)]/30 cursor-not-allowed'

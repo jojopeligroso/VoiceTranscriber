@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface TranscriptDisplayProps {
   text: string;
@@ -54,6 +54,7 @@ export default function TranscriptDisplay({
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(text);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const editedTextRef = useRef(editedText);
@@ -82,33 +83,49 @@ export default function TranscriptDisplay({
     }
   }, [isEditing]);
 
+  // Use pointerdown (not mousedown) so this fires reliably on iPad touch and
+  // Apple Pencil taps, not just mouse clicks.
   useEffect(() => {
     if (!isEditing) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         if (onTextChangeRef.current && editedTextRef.current !== textRef.current)
           onTextChangeRef.current(editedTextRef.current);
         setIsEditing(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, [isEditing]);
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     const textToCopy = isEditing ? editedText : text;
     if (!textToCopy) return;
-    await navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopyFailed(true);
+      setTimeout(() => setCopyFailed(false), 2000);
+    }
+  }, [isEditing, editedText, text]);
 
+  // Debounce scrollIntoView — rapid text appends (chunk-by-chunk transcription)
+  // cause jank on 120Hz ProMotion displays (iPad Pro, iPhone Pro).
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevTextLenRef = useRef(0);
   useEffect(() => {
     if (text && text.length > prevTextLenRef.current && containerRef.current) {
-      containerRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = setTimeout(() => {
+        containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 300);
     }
     prevTextLenRef.current = text?.length ?? 0;
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    };
   }, [text]);
 
   if ((whisperState === 'loading-model' || whisperState === 'transcribing') && !text) {
@@ -153,10 +170,12 @@ export default function TranscriptDisplay({
             <button
               onClick={(e) => { e.stopPropagation(); handleCopy(); }}
               className="p-2 rounded-md text-[var(--muted)] hover:text-[var(--accent)] hover:bg-[var(--surface)] transition-colors"
-              title="Copy to clipboard"
+              title={copyFailed ? 'Copy failed' : 'Copy to clipboard'}
             >
               {copied ? (
                 <CheckIcon className="w-7 h-7 text-[var(--teal)]" />
+              ) : copyFailed ? (
+                <CopyIcon className="w-7 h-7 text-[var(--red)]" />
               ) : (
                 <CopyIcon className="w-7 h-7" />
               )}

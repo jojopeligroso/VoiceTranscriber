@@ -21,7 +21,7 @@ export default function RecordButton({ state, onStart, onStop }: RecordButtonPro
           : 'bg-[var(--accent)] hover:opacity-90 focus:ring-[var(--accent)]'
         }
       `}
-      style={{ focusRingOffset: 'var(--bg)' } as React.CSSProperties}
+      style={{ '--tw-ring-offset-color': 'var(--bg)' } as React.CSSProperties}
       aria-label={isRecording ? 'Stop recording' : 'Start recording'}
     >
       {isRecording ? (

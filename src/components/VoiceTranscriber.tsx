@@ -94,13 +94,14 @@ function ModelSettings({ modelId, onChange, disabled, models, note }: { modelId:
   const panelRef = useRef<HTMLDivElement>(null);
   const current = models.find(m => m.id === modelId) ?? WHISPER_MODELS.find(m => m.id === modelId);
 
+  // Use pointerdown (not mousedown) for reliable iPad touch + Apple Pencil.
   useEffect(() => {
     if (!open) return;
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (e: PointerEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('pointerdown', handleClick);
+    return () => document.removeEventListener('pointerdown', handleClick);
   }, [open]);
 
   return (
@@ -256,6 +257,28 @@ function InfoPanel({ mode, lastResult, currentModel }: { mode: Mode; lastResult:
   );
 }
 
+// Diagnostic: detect page reloads vs React remounts on iOS. A sessionStorage
+// counter increments on every component mount. If it exceeds 1 within a short
+// window, the page reloaded (iOS tab kill, content process crash, etc.).
+function usePageLifecycle() {
+  const [reloadCount, setReloadCount] = useState(0);
+  useEffect(() => {
+    try {
+      const key = 'vt-mount-count';
+      const tsKey = 'vt-mount-ts';
+      const prev = Number(sessionStorage.getItem(key) || '0');
+      const prevTs = Number(sessionStorage.getItem(tsKey) || '0');
+      const now = Date.now();
+      // If the last mount was within 30 seconds, this is a reload, not a fresh visit.
+      const count = (now - prevTs < 30_000) ? prev + 1 : 0;
+      sessionStorage.setItem(key, String(count));
+      sessionStorage.setItem(tsKey, String(now));
+      setReloadCount(count);
+    } catch { /* ignore */ }
+  }, []);
+  return reloadCount;
+}
+
 export interface VoiceTranscriberProps {
   defaultMode?: Mode;
   apiEndpoint?: string;
@@ -295,11 +318,7 @@ export default function VoiceTranscriber({
   const availableModels = modelsForPlatform();
   const [browserModelId, setBrowserModelId] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_MODEL_ID;
-    // On iOS, always lock to the single allowed Tiny English model — overriding
-    // any previously-saved larger model so a returning user can't get stuck in
-    // the out-of-memory download loop.
     if (isIOS()) return IOS_ALLOWED_MODEL_ID;
-    // localStorage can throw in iOS Safari private browsing — guard the read.
     try {
       return localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL_ID;
     } catch {
@@ -307,8 +326,9 @@ export default function VoiceTranscriber({
     }
   });
 
-  // If iOS had a stale larger model saved, correct the persisted value so it
-  // doesn't linger for non-iOS sessions on the same profile.
+  // Detect page reloads for diagnostics.
+  const reloadCount = usePageLifecycle();
+
   useEffect(() => {
     if (isIOS()) {
       try { localStorage.setItem(MODEL_STORAGE_KEY, IOS_ALLOWED_MODEL_ID); } catch { /* ignore */ }
@@ -316,11 +336,8 @@ export default function VoiceTranscriber({
   }, []);
 
   const handleModelChange = (id: string) => {
-    // Defensive: ignore selections that aren't permitted on this platform
-    // (the disabled buttons already prevent this, but guard anyway).
     if (!isModelAllowedOnPlatform(id)) return;
     setBrowserModelId(id);
-    // localStorage can throw in private browsing — selection still works in-memory.
     try { localStorage.setItem(MODEL_STORAGE_KEY, id); } catch { /* ignore */ }
   };
 
@@ -339,30 +356,30 @@ export default function VoiceTranscriber({
     (recorder.state === 'idle' || recorder.state === 'recording');
 
   // Populate editor from active bucket's snippets on initial load and bucket switch.
-  // Hardening: never overwrite text the user has already typed/recorded. We only
-  // auto-fill when the editor is empty — otherwise switching buckets mid-dictation
-  // would silently destroy their work. They can still tap "Clear" to reset.
   const activeBucketIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!snippets.ready || !snippets.activeBucketId) return;
     if (activeBucketIdRef.current === snippets.activeBucketId) return;
     activeBucketIdRef.current = snippets.activeBucketId;
 
-    // Don't trample existing editor content — only seed an empty editor.
     setAccumulatedText((prev) => {
       if (prev) return prev;
       const bucketSnippets = snippets.snippetsByBucket(snippets.activeBucketId!);
       if (bucketSnippets.length === 0) return prev;
-      // Oldest first for natural reading order
       return [...bucketSnippets].reverse().map((s) => s.text).join('\n');
     });
-  }, [snippets.ready, snippets.activeBucketId, snippets.snippetsByBucket]);
+  }, [snippets.ready, snippets.activeBucketId, snippets.snippetsByBucket, setAccumulatedText]);
 
+  // Trigger transcription when recording stops. Only depend on the specific
+  // properties we read, not the entire activeWhisper object (which is recreated
+  // every render and would cause unnecessary re-runs).
+  const transcribeFnRef = useRef(activeWhisper.transcribe);
+  transcribeFnRef.current = activeWhisper.transcribe;
   useEffect(() => {
     if (recorder.state === 'stopped' && recorder.audioBlob && activeWhisper.state === 'idle') {
-      activeWhisper.transcribe(recorder.audioBlob);
+      transcribeFnRef.current(recorder.audioBlob);
     }
-  }, [recorder.state, recorder.audioBlob, activeWhisper]);
+  }, [recorder.state, recorder.audioBlob, activeWhisper.state]);
 
   const addSnippet = snippets.addSnippet;
   const appendModeRef = useRef(appendMode);
@@ -376,25 +393,34 @@ export default function VoiceTranscriber({
         setAccumulatedText(newText);
       }
       prevWhisperTextRef.current = newText;
-      // Auto-save each finished transcript into the active bucket. Dedup in
-      // useSnippets prevents double-saving identical text.
       addSnippet(newText);
     }
     if (!newText) {
       prevWhisperTextRef.current = '';
     }
-  }, [activeWhisper.text, addSnippet]);
+  }, [activeWhisper.text, addSnippet, setAccumulatedText]);
 
   const handleGetReady = () => {
     whisperBrowser.loadModel();
   };
 
+  // Capture timeout IDs so rapid taps can't queue duplicate starts.
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    };
+  }, []);
+
   const handleStart = () => {
+    if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
     setDismissedError(null);
     recorder.reset();
     whisperBrowser.reset();
     whisperAPI.reset();
-    setTimeout(() => recorder.start(), 0);
+    startTimeoutRef.current = setTimeout(() => recorder.start(), 0);
   };
 
   const handleNewRecording = () => {
@@ -423,13 +449,14 @@ export default function VoiceTranscriber({
 
   const handleInsertSnippet = useCallback((text: string) => {
     setAccumulatedText(prev => (prev ? prev + '\n' + text : text));
-  }, []);
+  }, [setAccumulatedText]);
 
   const handleRetry = useCallback(() => {
     if (recorder.audioBlob) {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
       setDismissedError(null);
       activeWhisper.reset();
-      setTimeout(() => {
+      retryTimeoutRef.current = setTimeout(() => {
         if (recorder.audioBlob) activeWhisper.transcribe(recorder.audioBlob);
       }, 50);
     }
@@ -442,6 +469,15 @@ export default function VoiceTranscriber({
     <div className={`relative flex flex-col items-center gap-4 w-full max-w-md mx-auto px-4 py-2 sm:px-6 ${className ?? ''}`}>
       <ThemeToggle />
       <h1 className="text-xl font-semibold text-[var(--fg)] text-center w-full" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>VoiceTranscriber</h1>
+
+      {/* Reload detector — only visible when the page has reloaded recently */}
+      {reloadCount > 0 && (
+        <div className="w-full rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-2">
+          <p className="text-xs text-[var(--accent)] text-center">
+            Page reloaded {reloadCount} time{reloadCount !== 1 ? 's' : ''} recently (browser killed the tab)
+          </p>
+        </div>
+      )}
 
       {/* In-app browser warning */}
       {inApp && !inAppWarningDismissed && (

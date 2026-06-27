@@ -36,3 +36,12 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  body { transition: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

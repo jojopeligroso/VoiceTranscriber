@@ -88,7 +88,14 @@ export function useWhisperBrowser(modelId: string = DEFAULT_MODEL_ID) {
       setModelReady(false);
       setState('idle');
     }
+    // Clear stale progress data for the new model
+    filesRef.current.clear();
   }, [modelId]);
+
+  // Clean up file progress map on unmount to free memory.
+  useEffect(() => {
+    return () => { filesRef.current.clear(); };
+  }, []);
 
   // Detect a reload that interrupted a previous model load (iOS memory kill).
   // Runs once on mount: if the load sentinel is still set but no pipeline is
